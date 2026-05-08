@@ -40,11 +40,29 @@ export async function getAdminChatUid(): Promise<string | null> {
   const fromSettings = data?.adminUid || data?.admin_uid || null;
   if (fromSettings) return fromSettings;
 
+  // Try multiple admin-identification strategies. Different schemas exist
+  // across the codebase:
+  //   - role: 'super_admin' | 'store_admin'
+  //   - userType: 'ADMIN'
+  //   - isAdmin: true
+  // Falling back through them avoids the "Support unavailable" state when
+  // an admin exists under a different field name.
   const usersRef = collection(db(), USERS);
-  const q = query(usersRef, where('role', 'in', ['super_admin', 'store_admin']), limit(1));
-  const usersSnap = await getDocs(q);
-  const first = usersSnap.docs[0];
-  return first?.id ?? null;
+  const strategies = [
+    query(usersRef, where('role', 'in', ['super_admin', 'store_admin']), limit(1)),
+    query(usersRef, where('userType', '==', 'ADMIN'), limit(1)),
+    query(usersRef, where('isAdmin', '==', true), limit(1)),
+  ];
+  for (const q of strategies) {
+    try {
+      const usersSnap = await getDocs(q);
+      const first = usersSnap.docs[0];
+      if (first?.id) return first.id;
+    } catch {
+      /* field may not exist on every doc — try next strategy */
+    }
+  }
+  return null;
 }
 
 export function subscribeToAdminMessages(

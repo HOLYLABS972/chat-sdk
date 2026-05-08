@@ -52,6 +52,11 @@ export { useOrderChat } from './core/hooks/useOrderChat';
 export type { UseOrderChatResult } from './core/hooks/useOrderChat';
 export { useAdminChat } from './core/hooks/useAdminChat';
 export type { UseAdminChatResult } from './core/hooks/useAdminChat';
+export { useOrderConversations } from './core/hooks/useOrderConversations';
+export type {
+  UseOrderConversationsResult,
+  OrderConversationRow,
+} from './core/hooks/useOrderConversations';
 
 // Billing
 export {

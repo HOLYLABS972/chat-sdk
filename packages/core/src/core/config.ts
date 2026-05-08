@@ -35,20 +35,35 @@ export const DEFAULT_COLLECTIONS: CollectionPaths = {
 };
 
 let _config: ChatSDKConfig | null = null;
+const _listeners = new Set<() => void>();
 
 export function initChatSDK(config: ChatSDKConfig): void {
   _config = config;
+  _listeners.forEach((l) => l());
 }
 
 /**
  * Update the current user without re-initializing the whole SDK.
- * Use after login/logout when Firestore + tenantId stay the same.
+ * Use after login/logout when Firestore + tenantId stay the same. Hooks that
+ * depend on currentUser.id will re-subscribe automatically.
  */
 export function setCurrentUser(user: ChatUser): void {
   if (!_config) {
     throw new Error('[chat-sdk] setCurrentUser called before initChatSDK');
   }
   _config = { ..._config, currentUser: user };
+  _listeners.forEach((l) => l());
+}
+
+/**
+ * Subscribe to config changes (init / setCurrentUser). Used internally by
+ * hooks to re-run their effects when the current user is set after mount.
+ */
+export function subscribeToConfigChanges(cb: () => void): () => void {
+  _listeners.add(cb);
+  return () => {
+    _listeners.delete(cb);
+  };
 }
 
 export function getConfig(): ChatSDKConfig {

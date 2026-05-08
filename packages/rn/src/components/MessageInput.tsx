@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, TextInput, Pressable, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import type { WidgetTheme } from '../theme';
+import type { WidgetLabels } from '../i18n';
 
 export interface MessageInputProps {
   theme: WidgetTheme;
@@ -8,15 +9,19 @@ export interface MessageInputProps {
   placeholder?: string;
   disabled?: boolean;
   disabledReason?: string;
+  labels?: WidgetLabels;
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
   theme,
   onSend,
-  placeholder = 'Type a message…',
+  placeholder,
   disabled = false,
   disabledReason,
+  labels,
 }) => {
+  const placeholderText = placeholder ?? labels?.typeMessage ?? 'Type a message…';
+  const sendText = labels?.send ?? 'Send';
   const [value, setValue] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -47,7 +52,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       <TextInput
         value={value}
         onChangeText={setValue}
-        placeholder={placeholder}
+        placeholder={placeholderText}
         placeholderTextColor={theme.textSecondary}
         multiline
         editable={!disabled && !sending}
@@ -71,7 +76,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         {sending ? (
           <ActivityIndicator size="small" color={theme.primaryText} />
         ) : (
-          <Text style={[styles.sendText, { color: theme.primaryText }]}>Send</Text>
+          <Text style={[styles.sendText, { color: theme.primaryText }]}>{sendText}</Text>
         )}
       </Pressable>
     </View>

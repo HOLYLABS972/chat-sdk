@@ -1,9 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Modal,
   View,
   Text,
-  Pressable,
   StyleSheet,
   FlatList,
   KeyboardAvoidingView,
@@ -13,22 +12,144 @@ import {
 } from 'react-native';
 import { useAdminChat, getConfig } from '@holylabs/chat-sdk';
 import type { WidgetTheme } from '../theme';
+import type { FaqItem, QuickLink } from '../types';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
+import { HelpHeader } from './HelpHeader';
+import { LandingView } from './LandingView';
+import { FaqArticleView } from './FaqArticleView';
+import { ConversationsListView } from './ConversationsListView';
+import { OrderChatView } from './OrderChatView';
+import { defaultFaq, getLabels, type Lang, type WidgetLabels } from '../i18n';
 
 export interface ChatboxProps {
   visible: boolean;
   onClose: () => void;
   theme: WidgetTheme;
   brand: { name: string; greeting?: string };
+  faq?: FaqItem[];
+  quickLinks?: QuickLink[];
+  language?: Lang;
+  labels?: Partial<WidgetLabels>;
+  isRTL?: boolean;
 }
 
+type ViewState =
+  | { kind: 'landing' }
+  | { kind: 'conversations' } // list of order chats
+  | { kind: 'order-chat'; orderId: string } // single order chat
+  | { kind: 'support' } // admin / support chat
+  | { kind: 'faq'; item: FaqItem };
+
 /**
- * The chatbox shown when the floating button is tapped.
- * Currently wires to admin/support chat (one-on-one with admin).
- * v0.2 will add the help-center landing screen with FAQ + multiple conversations.
+ * Multi-view support modal (Trustee/Intercom-style).
+ *
+ *   landing
+ *     ↓ Messages card        ↓ Send-us-a-message CTA       ↓ FAQ row
+ *   conversations           support (admin chat)            faq article
+ *     ↓ tap a row
+ *   order-chat
  */
-export const Chatbox: React.FC<ChatboxProps> = ({ visible, onClose, theme, brand }) => {
+export const Chatbox: React.FC<ChatboxProps> = ({
+  visible,
+  onClose,
+  theme,
+  brand,
+  faq,
+  quickLinks,
+  language = 'en',
+  labels: labelOverrides,
+  isRTL = language === 'he',
+}) => {
+  const [view, setView] = useState<ViewState>({ kind: 'landing' });
+  const labels = getLabels(language, labelOverrides);
+  // Role-aware default FAQ in the active language. Consumer-supplied `faq`
+  // always wins.
+  const role = (() => {
+    try {
+      return getConfig().currentUser.role;
+    } catch {
+      return 'customer' as const;
+    }
+  })();
+  const effectiveFaq = faq && faq.length ? faq : defaultFaq(role, language);
+
+  // Reset to landing each time the modal opens.
+  useEffect(() => {
+    if (visible) setView({ kind: 'landing' });
+  }, [visible]);
+
+  const goBack = () => {
+    if (view.kind === 'order-chat') {
+      setView({ kind: 'conversations' });
+    } else {
+      setView({ kind: 'landing' });
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+      presentationStyle="pageSheet"
+      transparent={false}
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
+        <HelpHeader
+          theme={theme}
+          brand={brand}
+          onClose={onClose}
+          onBack={view.kind === 'landing' ? undefined : goBack}
+        />
+
+        {view.kind === 'landing' && (
+          <LandingView
+            theme={theme}
+            greeting={brand.greeting}
+            faq={effectiveFaq}
+            // Wrap each quick link so tapping closes the modal first; otherwise
+            // the destination screen renders behind the still-open chatbox and
+            // looks like nothing happened.
+            quickLinks={quickLinks?.map((link) => ({
+              ...link,
+              onPress: () => {
+                onClose();
+                // Defer so the modal is fully dismissed before nav fires —
+                // some routers swallow pushes during a presentation transition.
+                setTimeout(() => link.onPress(), 0);
+              },
+            }))}
+            labels={labels}
+            isRTL={isRTL}
+            onOpenMessages={() => setView({ kind: 'conversations' })}
+            onOpenFaq={(item) => setView({ kind: 'faq', item })}
+            onSendNewMessage={() => setView({ kind: 'support' })}
+          />
+        )}
+
+        {view.kind === 'conversations' && (
+          <ConversationsListView
+            theme={theme}
+            labels={labels}
+            onOpenOrderChat={(orderId) => setView({ kind: 'order-chat', orderId })}
+            onSendNewMessage={() => setView({ kind: 'support' })}
+          />
+        )}
+
+        {view.kind === 'order-chat' && (
+          <OrderChatView theme={theme} orderId={view.orderId} labels={labels} />
+        )}
+
+        {view.kind === 'support' && <SupportChat theme={theme} labels={labels} />}
+
+        {view.kind === 'faq' && <FaqArticleView theme={theme} item={view.item} />}
+      </SafeAreaView>
+    </Modal>
+  );
+};
+
+const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ theme, labels }) => {
   const { messages, sendMessage, loading, error, adminId } = useAdminChat();
   const listRef = useRef<FlatList<unknown> | null>(null);
   const currentUserId = (() => {
@@ -40,125 +161,68 @@ export const Chatbox: React.FC<ChatboxProps> = ({ visible, onClose, theme, brand
   })();
 
   useEffect(() => {
-    if (!visible || !messages.length) return;
+    if (!messages.length) return;
     const t = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 60);
     return () => clearTimeout(t);
-  }, [visible, messages.length]);
+  }, [messages.length]);
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      onRequestClose={onClose}
-      presentationStyle="pageSheet"
-      transparent={false}
-    >
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
-        <View style={[styles.header, { backgroundColor: theme.primary }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.brand, { color: theme.primaryText }]} numberOfLines={1}>
-              {brand.name}
-            </Text>
-            {brand.greeting && (
-              <Text style={[styles.greeting, { color: theme.primaryText, opacity: 0.85 }]} numberOfLines={1}>
-                {brand.greeting}
-              </Text>
-            )}
-          </View>
-          <Pressable
-            onPress={onClose}
-            accessibilityLabel="Close support chat"
-            style={({ pressed }) => [
-              styles.closeBtn,
-              { backgroundColor: 'rgba(255,255,255,0.18)', opacity: pressed ? 0.7 : 1 },
-            ]}
-          >
-            <Text style={[styles.closeIcon, { color: theme.primaryText }]}>×</Text>
-          </Pressable>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {loading && messages.length === 0 ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={theme.primary} />
         </View>
-
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-        >
-          {loading && messages.length === 0 ? (
-            <View style={styles.center}>
-              <ActivityIndicator color={theme.primary} />
-            </View>
-          ) : error ? (
-            <View style={styles.center}>
-              <Text style={[styles.errorText, { color: theme.textSecondary }]}>
-                Couldn't load messages. Pull to retry.
-              </Text>
-            </View>
-          ) : messages.length === 0 ? (
-            <View style={styles.center}>
-              <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>How can we help?</Text>
-              <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                Send us a message — we usually reply within a few minutes.
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              ref={listRef as unknown as React.RefObject<FlatList<unknown>>}
-              data={messages}
-              keyExtractor={(m) => (m as { id: string }).id}
-              renderItem={({ item }) => {
-                const m = item as { id: string; senderId?: string; senderUid?: string; message: string; createdAt?: unknown };
-                const isSelf = (m.senderUid ?? m.senderId) === currentUserId;
-                const ts =
-                  typeof m.createdAt === 'number'
-                    ? m.createdAt
-                    : (m.createdAt as { toMillis?: () => number })?.toMillis?.() ?? undefined;
-                return <MessageBubble text={m.message} isSelf={isSelf} timestamp={ts} theme={theme} />;
-              }}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-            />
-          )}
-
-          <MessageInput
-            theme={theme}
-            onSend={async (text) => {
-              await sendMessage(text);
-            }}
-            disabled={!adminId && !loading}
-            disabledReason={!adminId && !loading ? 'Support is unavailable right now.' : undefined}
-          />
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </Modal>
+      ) : error ? (
+        <View style={styles.center}>
+          <Text style={[styles.errorText, { color: theme.textSecondary }]}>
+            {labels.couldNotLoadMessages}
+          </Text>
+        </View>
+      ) : messages.length === 0 ? (
+        <View style={styles.center}>
+          <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>{labels.howCanWeHelp}</Text>
+          <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+            {labels.supportReplyTime}
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          ref={listRef as unknown as React.RefObject<FlatList<unknown>>}
+          data={messages}
+          keyExtractor={(m) => (m as { id: string }).id}
+          renderItem={({ item }) => {
+            const m = item as {
+              id: string;
+              senderId?: string;
+              senderUid?: string;
+              message: string;
+              createdAt?: unknown;
+            };
+            const isSelf = (m.senderUid ?? m.senderId) === currentUserId;
+            const ts =
+              typeof m.createdAt === 'number'
+                ? m.createdAt
+                : (m.createdAt as { toMillis?: () => number })?.toMillis?.() ?? undefined;
+            return <MessageBubble text={m.message} isSelf={isSelf} timestamp={ts} theme={theme} />;
+          }}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+      <MessageInput
+        theme={theme}
+        labels={labels}
+        onSend={async (text) => {
+          await sendMessage(text);
+        }}
+      />
+    </KeyboardAvoidingView>
   );
 };
 
+// FAQ defaults moved to ../i18n.ts (role + language aware).
+
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  brand: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  greeting: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeIcon: {
-    fontSize: 24,
-    lineHeight: 24,
-    fontWeight: '500',
-  },
   center: {
     flex: 1,
     alignItems: 'center',

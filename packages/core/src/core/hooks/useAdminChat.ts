@@ -5,7 +5,7 @@ import {
   subscribeToAdminMessages,
   type AdminChatMessage,
 } from '../services/AdminMessageService';
-import { getConfig } from '../config';
+import { getConfig, subscribeToConfigChanges } from '../config';
 
 export interface UseAdminChatResult {
   adminId: string | null;
@@ -24,12 +24,26 @@ export function useAdminChat(): UseAdminChatResult {
   const [messages, setMessages] = useState<AdminChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  // Bumped whenever the SDK config (especially currentUser) changes — forces
+  // the subscription effect to re-run with the new user identity. Avoids the
+  // race where the widget mounts before setCurrentUser has propagated the
+  // logged-in user into the SDK, which produced an empty driverId and a
+  // 2-segment Firestore path.
+  const [cfgVersion, setCfgVersion] = useState(0);
+  useEffect(() => subscribeToConfigChanges(() => setCfgVersion((v) => v + 1)), []);
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
     let cancelled = false;
     (async () => {
       try {
+        const cfg = getConfig();
+        const userId = cfg.currentUser.id;
+        if (!userId) {
+          // No user yet — wait for setCurrentUser, which bumps cfgVersion.
+          setLoading(false);
+          return;
+        }
         const uid = await getAdminChatUid();
         if (cancelled) return;
         setAdminId(uid);
@@ -37,10 +51,10 @@ export function useAdminChat(): UseAdminChatResult {
           setLoading(false);
           return;
         }
-        const cfg = getConfig();
+        setLoading(true);
         unsub = subscribeToAdminMessages(
           uid,
-          cfg.currentUser.id,
+          userId,
           (m) => {
             setMessages(m);
             setLoading(false);
@@ -59,7 +73,7 @@ export function useAdminChat(): UseAdminChatResult {
       cancelled = true;
       unsub?.();
     };
-  }, []);
+  }, [cfgVersion]);
 
   const sendMessage = useCallback(
     async (text: string, attachments: string[] = []) => {
