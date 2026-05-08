@@ -1,0 +1,41 @@
+{
+  "name": "@holylabs/chat-sdk",
+  "version": "0.1.0",
+  "description": "Drop-in chat infrastructure SDK for marketplace and delivery apps. Order chat, admin chat, and per-conversation billing.",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "chat",
+    "sdk",
+    "firebase",
+    "firestore",
+    "react-native",
+    "delivery",
+    "marketplace"
+  ],
+  "author": "HolyLabs",
+  "license": "UNLICENSED",
+  "private": true,
+  "peerDependencies": {
+    "react": ">=18",
+    "firebase": ">=10"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "firebase": "^10.0.0",
+    "react": "^18.2.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0"
+  }
+}
