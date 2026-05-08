@@ -1,7 +1,7 @@
 // Public API for @holylabs/chat-sdk
 
 // Init / config
-export { initChatSDK, getConfig, isInitialized, DEFAULT_COLLECTIONS } from './core/config';
+export { initChatSDK, setCurrentUser, getConfig, isInitialized, DEFAULT_COLLECTIONS } from './core/config';
 export type { ChatSDKConfig, CollectionPaths } from './core/config';
 
 // Types

@@ -40,6 +40,17 @@ export function initChatSDK(config: ChatSDKConfig): void {
   _config = config;
 }
 
+/**
+ * Update the current user without re-initializing the whole SDK.
+ * Use after login/logout when Firestore + tenantId stay the same.
+ */
+export function setCurrentUser(user: ChatUser): void {
+  if (!_config) {
+    throw new Error('[chat-sdk] setCurrentUser called before initChatSDK');
+  }
+  _config = { ..._config, currentUser: user };
+}
+
 export function getConfig(): ChatSDKConfig {
   if (!_config) {
     throw new Error(

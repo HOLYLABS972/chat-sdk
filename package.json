@@ -1,41 +1,17 @@
 {
-  "name": "@holylabs/chat-sdk",
+  "name": "holylabs-chat-sdk-monorepo",
   "version": "0.1.0",
-  "description": "Drop-in chat infrastructure SDK for marketplace and delivery apps. Order chat, admin chat, and per-conversation billing.",
-  "main": "dist/index.js",
-  "module": "dist/index.mjs",
-  "types": "dist/index.d.ts",
-  "files": [
-    "dist",
-    "README.md"
+  "private": true,
+  "description": "Monorepo for @holylabs/chat-sdk (core), @holylabs/chat-sdk-rn (React Native widget), and @holylabs/chat-sdk-web (Web widget).",
+  "workspaces": [
+    "packages/*"
   ],
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
-  },
-  "keywords": [
-    "chat",
-    "sdk",
-    "firebase",
-    "firestore",
-    "react-native",
-    "delivery",
-    "marketplace"
-  ],
-  "author": "HolyLabs",
-  "license": "UNLICENSED",
-  "private": true,
-  "peerDependencies": {
-    "react": ">=18",
-    "firebase": ">=10"
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "clean": "npm run clean --workspaces --if-present"
   },
   "devDependencies": {
-    "@types/react": "^18.2.0",
-    "firebase": "^10.0.0",
-    "react": "^18.2.0",
-    "tsup": "^8.0.0",
     "typescript": "^5.3.0"
   }
 }
