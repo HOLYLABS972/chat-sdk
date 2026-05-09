@@ -7,6 +7,9 @@ import type { WidgetLabels } from '../i18n';
 export interface LandingViewProps {
   theme: WidgetTheme;
   greeting?: string;
+  /** When true, the H1 greeting is hidden because the parent header is
+   *  already rendering it (hero mode). Default false. */
+  hideGreeting?: boolean;
   faq: FaqItem[];
   /** Optional action shortcuts (e.g. Change bank, Change vehicle). */
   quickLinks?: QuickLink[];
@@ -24,6 +27,7 @@ export interface LandingViewProps {
 export const LandingView: React.FC<LandingViewProps> = ({
   theme,
   greeting,
+  hideGreeting,
   faq,
   quickLinks,
   labels,
@@ -50,7 +54,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
     >
-      {greeting && (
+      {greeting && !hideGreeting && (
         <Text style={[styles.greeting, { color: theme.textPrimary }]} numberOfLines={2}>
           {greeting}
         </Text>

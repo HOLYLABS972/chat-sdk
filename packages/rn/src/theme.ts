@@ -5,6 +5,11 @@
  */
 export interface WidgetTheme {
   primary: string;
+  /** Optional 2+ color gradient used for the hero header background.
+   *  When set, the chatbox header renders as an Intercom-style colored hero
+   *  (logo + agent avatars + greeting). When omitted, header falls back to
+   *  the flat minimal bar using `background` + `border`. */
+  primaryGradient?: readonly string[];
   primaryText: string;
   background: string;
   surface: string;

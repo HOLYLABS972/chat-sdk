@@ -16,7 +16,7 @@ export type { MessageInputProps } from './components/MessageInput';
 export { DEFAULT_LIGHT_THEME, DEFAULT_DARK_THEME, mergeTheme } from './theme';
 export type { WidgetTheme } from './theme';
 
-export type { FaqItem, QuickLink } from './types';
+export type { Brand, FaqItem, QuickLink, SupportAgent } from './types';
 
 export { getLabels, FAQ_CUSTOMER_EN, FAQ_CUSTOMER_HE, FAQ_DRIVER_EN, FAQ_DRIVER_HE, defaultFaq } from './i18n';
 export type { Lang, WidgetLabels } from './i18n';

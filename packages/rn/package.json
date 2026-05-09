@@ -1,6 +1,6 @@
 {
   "name": "@holylabs/chat-sdk-rn",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "React Native floating support widget for @holylabs/chat-sdk. Drop-in <SupportWidget /> with FAB + chatbox.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -29,7 +29,13 @@
     "@holylabs/chat-sdk": "*",
     "react": ">=18",
     "react-native": ">=0.73",
-    "firebase": ">=10"
+    "firebase": ">=10",
+    "expo-linear-gradient": ">=12"
+  },
+  "peerDependenciesMeta": {
+    "expo-linear-gradient": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@holylabs/chat-sdk": "*",

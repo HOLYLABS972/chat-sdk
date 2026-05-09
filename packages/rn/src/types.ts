@@ -17,3 +17,34 @@ export interface QuickLink {
   hint?: string;
   onPress: () => void;
 }
+
+/** A single support agent avatar shown in the hero header
+ *  (Intercom-style "your team is online" cluster). */
+export interface SupportAgent {
+  /** Image source: remote URI string or a local require()'d module. */
+  source: { uri: string } | number;
+  /** Optional background color for the avatar circle (used as a halo
+   *  behind transparent PNGs / emoji-style art). */
+  bgColor?: string;
+  /** Accessibility label / tooltip — typically the agent's name. */
+  name?: string;
+}
+
+/** Brand identity for the chatbox header.
+ *
+ *  Minimal use: `{ name }` → flat header bar, current behavior.
+ *  Hero use: pass `logo` and/or `agents` (combined with
+ *  `theme.primaryGradient`) → Intercom-style colored hero header. */
+export interface Brand {
+  name: string;
+  /** Big H1 shown inside the hero header (or above the cards in flat mode).
+   *  E.g. "How can we help?". */
+  greeting?: string;
+  /** Small line above the greeting in hero mode. E.g. "Hi there 👋". */
+  tagline?: string;
+  /** Company logo shown at the top-left of the hero header.
+   *  Image source: remote URI string or a local require()'d module. */
+  logo?: { uri: string } | number;
+  /** Up to ~4 support agent avatars stacked at the top-right of the hero header. */
+  agents?: SupportAgent[];
+}

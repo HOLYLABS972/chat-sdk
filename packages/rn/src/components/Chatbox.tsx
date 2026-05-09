@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useAdminChat, getConfig } from '@holylabs/chat-sdk';
 import type { WidgetTheme } from '../theme';
-import type { FaqItem, QuickLink } from '../types';
+import type { Brand, FaqItem, QuickLink } from '../types';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
 import { HelpHeader } from './HelpHeader';
@@ -26,7 +26,7 @@ export interface ChatboxProps {
   visible: boolean;
   onClose: () => void;
   theme: WidgetTheme;
-  brand: { name: string; greeting?: string };
+  brand: Brand;
   faq?: FaqItem[];
   quickLinks?: QuickLink[];
   language?: Lang;
@@ -74,6 +74,12 @@ export const Chatbox: React.FC<ChatboxProps> = ({
   })();
   const effectiveFaq = faq && faq.length ? faq : defaultFaq(role, language);
 
+  // Hero header takes over rendering the greeting H1, so suppress the
+  // duplicate one in LandingView.
+  const heroHeader = Boolean(
+    brand.logo || (brand.agents && brand.agents.length) || theme.primaryGradient,
+  );
+
   // Reset to landing each time the modal opens.
   useEffect(() => {
     if (visible) setView({ kind: 'landing' });
@@ -95,18 +101,31 @@ export const Chatbox: React.FC<ChatboxProps> = ({
       presentationStyle="pageSheet"
       transparent={false}
     >
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
-        <HelpHeader
-          theme={theme}
-          brand={brand}
-          onClose={onClose}
-          onBack={view.kind === 'landing' ? undefined : goBack}
-        />
+      <SafeAreaView
+        style={{
+          flex: 1,
+          // In hero mode, paint the safe-area top band with the gradient's
+          // start color so the status-bar area blends into the header
+          // instead of showing a white strip above it.
+          backgroundColor:
+            heroHeader && view.kind === 'landing'
+              ? theme.primaryGradient?.[0] ?? theme.primary
+              : theme.background,
+        }}
+      >
+        <View style={{ flex: 1, backgroundColor: theme.background }}>
+          <HelpHeader
+            theme={theme}
+            brand={brand}
+            onClose={onClose}
+            onBack={view.kind === 'landing' ? undefined : goBack}
+          />
 
         {view.kind === 'landing' && (
           <LandingView
             theme={theme}
             greeting={brand.greeting}
+            hideGreeting={heroHeader}
             faq={effectiveFaq}
             // Wrap each quick link so tapping closes the modal first; otherwise
             // the destination screen renders behind the still-open chatbox and
@@ -144,6 +163,7 @@ export const Chatbox: React.FC<ChatboxProps> = ({
         {view.kind === 'support' && <SupportChat theme={theme} labels={labels} />}
 
         {view.kind === 'faq' && <FaqArticleView theme={theme} item={view.item} />}
+        </View>
       </SafeAreaView>
     </Modal>
   );

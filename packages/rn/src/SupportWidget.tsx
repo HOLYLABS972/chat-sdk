@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { FloatingButton } from './components/FloatingButton';
 import { Chatbox } from './components/Chatbox';
 import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, mergeTheme, type WidgetTheme } from './theme';
-import type { FaqItem, QuickLink } from './types';
+import type { Brand, FaqItem, QuickLink } from './types';
 import type { Lang, WidgetLabels } from './i18n';
 
 export interface SupportWidgetProps {
-  brand: { name: string; greeting?: string };
+  brand: Brand;
   /** FAQ items shown on the landing screen. Defaults to a built-in role-aware list (driver / customer) in the active language. */
   faq?: FaqItem[];
   /** Quick navigation links shown above the FAQ (e.g. Change bank, Change vehicle, Delete data). */
