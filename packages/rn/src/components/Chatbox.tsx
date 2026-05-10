@@ -8,8 +8,26 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  SafeAreaView,
+  SafeAreaView as RNSafeAreaView,
 } from 'react-native';
+
+// react-native-safe-area-context is the de-facto standard in Expo apps
+// and lets us inset only specific edges. Lazy-require so the SDK degrades
+// gracefully if the consumer hasn't installed it (falls back to RN's
+// SafeAreaView, which insets all edges).
+let SafeAreaViewCtx:
+  | React.ComponentType<{
+      edges?: ReadonlyArray<'top' | 'bottom' | 'left' | 'right'>;
+      style?: object;
+      children?: React.ReactNode;
+    }>
+  | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  SafeAreaViewCtx = require('react-native-safe-area-context').SafeAreaView;
+} catch {
+  SafeAreaViewCtx = null;
+}
 import { useAdminChat, getConfig } from '@holylabs/chat-sdk';
 import type { WidgetTheme } from '../theme';
 import type { Brand, FaqItem, QuickLink } from '../types';
@@ -101,25 +119,50 @@ export const Chatbox: React.FC<ChatboxProps> = ({
       presentationStyle="pageSheet"
       transparent={false}
     >
-      <SafeAreaView
-        style={{
-          flex: 1,
-          // In hero mode, paint the safe-area top band with the gradient's
-          // start color so the status-bar area blends into the header
-          // instead of showing a white strip above it.
-          backgroundColor:
-            heroHeader && view.kind === 'landing'
-              ? theme.primaryGradient?.[0] ?? theme.primary
-              : theme.background,
-        }}
-      >
-        <View style={{ flex: 1, backgroundColor: theme.background }}>
-          <HelpHeader
-            theme={theme}
-            brand={brand}
-            onClose={onClose}
-            onBack={view.kind === 'landing' ? undefined : goBack}
-          />
+      <View style={{ flex: 1, backgroundColor: theme.background }}>
+        {/* Top safe-area band: paint behind the status bar. In hero mode
+            on the landing screen we use the gradient's start color so it
+            blends into the header; otherwise it's the surface color so
+            we don't show a strip of an unexpected color above the bar. */}
+        {SafeAreaViewCtx ? (
+          <SafeAreaViewCtx
+            edges={['top']}
+            style={{
+              backgroundColor:
+                heroHeader && view.kind === 'landing'
+                  ? theme.primaryGradient?.[0] ?? theme.primary
+                  : theme.background,
+            }}
+          >
+            <HelpHeader
+              theme={theme}
+              brand={brand}
+              onClose={onClose}
+              onBack={view.kind === 'landing' ? undefined : goBack}
+            />
+          </SafeAreaViewCtx>
+        ) : (
+          // Fallback: RN's SafeAreaView insets all sides, which puts a
+          // band of color across the bottom too. Wrap only the header
+          // so the bottom of the modal stays white.
+          <View
+            style={{
+              backgroundColor:
+                heroHeader && view.kind === 'landing'
+                  ? theme.primaryGradient?.[0] ?? theme.primary
+                  : theme.background,
+            }}
+          >
+            <RNSafeAreaView>
+              <HelpHeader
+                theme={theme}
+                brand={brand}
+                onClose={onClose}
+                onBack={view.kind === 'landing' ? undefined : goBack}
+              />
+            </RNSafeAreaView>
+          </View>
+        )}
 
         {view.kind === 'landing' && (
           <LandingView
@@ -163,8 +206,7 @@ export const Chatbox: React.FC<ChatboxProps> = ({
         {view.kind === 'support' && <SupportChat theme={theme} labels={labels} />}
 
         {view.kind === 'faq' && <FaqArticleView theme={theme} item={view.item} />}
-        </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };
