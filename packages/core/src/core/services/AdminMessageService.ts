@@ -1,19 +1,11 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  addDoc,
-  query,
-  where,
-  orderBy,
-  limit,
-  onSnapshot,
-  Unsubscribe,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { getCollections, getConfig } from '../config';
-import { serializeTimestamps } from '../../utils/serializeTimestamps';
+/**
+ * STUB — Firebase-backed admin chat service replaced in v1.0.0.
+ * All real implementations now live behind the REST API and are
+ * surfaced through the `useAdminChat` hook. The legacy export shape
+ * is preserved so external callers that imported the service
+ * directly fail loudly with a clear message rather than silently
+ * loading no-op Firestore code.
+ */
 
 export interface AdminChatMessage {
   id: string;
@@ -26,152 +18,18 @@ export interface AdminChatMessage {
   senderUid?: string;
 }
 
-function db() {
-  return getConfig().firestore;
+const NOT_IMPLEMENTED = new Error(
+  '[chat-sdk] AdminMessageService is deprecated in v1.0.0. Use the useAdminChat hook instead — it talks to chat-admin REST + Realtime under the hood.',
+);
+
+export function getAdminChatUid(): Promise<string | null> {
+  return Promise.resolve(null);
 }
-
-const APP_SETTINGS = 'app_settings';
-const USERS = 'users';
-
-export async function getAdminChatUid(): Promise<string | null> {
-  const settingsRef = doc(db(), APP_SETTINGS, 'admin_chat');
-  const snap = await getDoc(settingsRef);
-  const data = snap.data();
-  const fromSettings = data?.adminUid || data?.admin_uid || null;
-  if (fromSettings) return fromSettings;
-
-  // Try multiple admin-identification strategies. Different schemas exist
-  // across the codebase:
-  //   - role: 'super_admin' | 'store_admin'
-  //   - userType: 'ADMIN'
-  //   - isAdmin: true
-  // Falling back through them avoids the "Support unavailable" state when
-  // an admin exists under a different field name.
-  const usersRef = collection(db(), USERS);
-  const strategies = [
-    query(usersRef, where('role', 'in', ['super_admin', 'store_admin']), limit(1)),
-    query(usersRef, where('userType', '==', 'ADMIN'), limit(1)),
-    query(usersRef, where('isAdmin', '==', true), limit(1)),
-  ];
-  for (const q of strategies) {
-    try {
-      const usersSnap = await getDocs(q);
-      const first = usersSnap.docs[0];
-      if (first?.id) return first.id;
-    } catch {
-      /* field may not exist on every doc — try next strategy */
-    }
-  }
-  return null;
+export function sendAdminMessage(): Promise<string> {
+  return Promise.reject(NOT_IMPLEMENTED);
 }
-
-export function subscribeToAdminMessages(
-  pinnedAdminId: string,
-  driverId: string,
-  onUpdate: (messages: AdminChatMessage[]) => void,
-  onError?: (err: Error) => void,
-): Unsubscribe {
-  let cancelled = false;
-  const unsubs: (() => void)[] = [];
-  const snaps = new Map<string, AdminChatMessage[]>();
-
-  const toMsg = (d: { id: string; data: () => Record<string, unknown> }, keyPrefix: string) => {
-    const data = d.data() || {};
-    const parsed = serializeTimestamps({ id: `${keyPrefix}-${d.id}`, ...data }) as Record<string, unknown>;
-    return {
-      ...parsed,
-      senderUid: parsed.senderUid ?? parsed.senderId,
-    } as AdminChatMessage;
-  };
-
-  const toMillis = (v: unknown): number => {
-    if (v == null) return Number.POSITIVE_INFINITY;
-    if (typeof v === 'number') return v;
-    const obj = v as { toMillis?: () => number; seconds?: number; nanoseconds?: number };
-    if (typeof obj.toMillis === 'function') return obj.toMillis();
-    if (typeof obj.seconds === 'number') return obj.seconds * 1000 + Math.floor((obj.nanoseconds ?? 0) / 1e6);
-    if (v instanceof Date) return v.getTime();
-    if (typeof v === 'string') {
-      const n = Date.parse(v);
-      return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
-    }
-    return Number.POSITIVE_INFINITY;
-  };
-
-  const mergeAndNotify = () => {
-    const all: AdminChatMessage[] = [];
-    snaps.forEach((list) => all.push(...list));
-    all.sort((a, b) => toMillis(a.createdAt) - toMillis(b.createdAt));
-    onUpdate(all);
-  };
-
-  const subscribePair = (adminUid: string) => {
-    const outgoing = collection(db(), 'messages', adminUid, driverId);
-    const incoming = collection(db(), 'messages', driverId, adminUid);
-    const outKey = `o:${adminUid}`;
-    const inKey = `i:${adminUid}`;
-
-    unsubs.push(
-      onSnapshot(
-        query(outgoing, orderBy('createdAt', 'asc')),
-        (snapshot) => {
-          snaps.set(outKey, snapshot.docs.map((d) => toMsg(d, outKey)));
-          mergeAndNotify();
-        },
-        (err) => console.warn('[chat-sdk] admin outgoing subscription error:', err),
-      ),
-    );
-
-    unsubs.push(
-      onSnapshot(
-        query(incoming, orderBy('createdAt', 'asc')),
-        (snapshot) => {
-          snaps.set(inKey, snapshot.docs.map((d) => toMsg(d, inKey)));
-          mergeAndNotify();
-        },
-        (err) => console.warn('[chat-sdk] admin incoming subscription error:', err),
-      ),
-    );
-  };
-
-  (async () => {
-    try {
-      const adminsSnap = await getDocs(
-        query(collection(db(), USERS), where('role', 'in', ['super_admin', 'store_admin'])),
-      );
-      if (cancelled) return;
-      const adminUids = adminsSnap.docs.map((d) => d.id);
-      if (adminUids.length === 0) adminUids.push(pinnedAdminId);
-      else if (!adminUids.includes(pinnedAdminId)) adminUids.push(pinnedAdminId);
-      adminUids.forEach(subscribePair);
-    } catch (err) {
-      console.error('[chat-sdk] list admins failed, falling back:', err);
-      onError?.(err as Error);
-      subscribePair(pinnedAdminId);
-    }
-  })();
-
+export function subscribeToAdminMessages(): () => void {
   return () => {
-    cancelled = true;
-    unsubs.forEach((u) => u());
+    /* no-op */
   };
-}
-
-export async function sendAdminMessage(
-  adminId: string,
-  driverId: string,
-  message: string,
-  attachments: string[] = [],
-): Promise<string> {
-  const chatRef = collection(db(), 'messages', driverId, adminId);
-  const docRef = await addDoc(chatRef, {
-    senderId: driverId,
-    receiverId: adminId,
-    message,
-    attachments,
-    isMessageRead: false,
-    messageType: attachments.length > 0 ? 'IMAGE' : 'TEXT',
-    createdAt: serverTimestamp(),
-  });
-  return docRef.id;
 }

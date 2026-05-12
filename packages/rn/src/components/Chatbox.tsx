@@ -85,7 +85,7 @@ export const Chatbox: React.FC<ChatboxProps> = ({
   // always wins.
   const role = (() => {
     try {
-      return getConfig().currentUser.role;
+      return getConfig().currentUser.role ?? ('customer' as const);
     } catch {
       return 'customer' as const;
     }

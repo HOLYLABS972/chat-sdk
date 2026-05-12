@@ -19,10 +19,15 @@ export interface QuickLink {
 }
 
 /** A single support agent avatar shown in the hero header
- *  (Intercom-style "your team is online" cluster). */
+ *  (Intercom-style "your team is online" cluster). Pass either
+ *  `source` (image) OR `icon` (custom React element, e.g. a vector
+ *  icon component). Icon takes precedence when both are set. */
 export interface SupportAgent {
   /** Image source: remote URI string or a local require()'d module. */
-  source: { uri: string } | number;
+  source?: { uri: string } | number;
+  /** Optional custom-rendered avatar — used for vector icons or
+   *  emoji-style placeholders when you don't have a real photo. */
+  icon?: import('react').ReactNode;
   /** Optional background color for the avatar circle (used as a halo
    *  behind transparent PNGs / emoji-style art). */
   bgColor?: string;

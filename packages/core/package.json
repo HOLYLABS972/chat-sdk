@@ -1,7 +1,7 @@
 {
   "name": "@holylabs/chat-sdk",
-  "version": "0.1.0",
-  "description": "Drop-in chat infrastructure SDK. Order chat, admin chat, and per-conversation billing. Framework-agnostic core.",
+  "version": "1.0.0",
+  "description": "Drop-in chat infrastructure SDK. Talks to a chat-admin REST API and Supabase Realtime — no Firebase required on the consumer side.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -18,20 +18,25 @@
   "keywords": [
     "chat",
     "sdk",
-    "firebase",
-    "firestore",
-    "delivery",
+    "supabase",
+    "realtime",
+    "support",
     "marketplace"
   ],
   "author": "HolyLabs",
   "license": "UNLICENSED",
   "peerDependencies": {
-    "react": ">=18",
-    "firebase": ">=10"
+    "@supabase/supabase-js": ">=2",
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "@supabase/supabase-js": {
+      "optional": true
+    }
   },
   "devDependencies": {
+    "@supabase/supabase-js": "^2.105.4",
     "@types/react": "^18.2.0",
-    "firebase": "^10.0.0",
     "react": "^18.2.0",
     "tsup": "^8.0.0",
     "typescript": "^5.3.0"

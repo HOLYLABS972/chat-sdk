@@ -114,7 +114,7 @@ const Row: React.FC<{ item: OrderConversationRow; theme: WidgetTheme; onPress: (
             {item.counterpartName}
           </Text>
           <Text style={[styles.time, { color: theme.textSecondary }]}>
-            {formatTime(item.lastAtMs)}
+            {item.lastAtMs ? formatTime(item.lastAtMs) : ''}
           </Text>
         </View>
         <View style={styles.titleRow}>
@@ -122,7 +122,7 @@ const Row: React.FC<{ item: OrderConversationRow; theme: WidgetTheme; onPress: (
             style={[
               styles.preview,
               { color: item.unread ? theme.textPrimary : theme.textSecondary },
-              item.unread && { fontWeight: '600' },
+              item.unread ? { fontWeight: '600' as const } : null,
             ]}
             numberOfLines={1}
           >

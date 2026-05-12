@@ -1,6 +1,12 @@
-import { doc, getDoc, runTransaction, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { getCollections, getConfig } from '../core/config';
+/**
+ * STUB — Firestore-backed billing meter replaced in v1.0.0. Billing
+ * accounting now happens server-side inside chat-admin (per-message
+ * counter on the tenant row), so the client SDK doesn't need to
+ * maintain its own meter. The hooks below preserve the legacy export
+ * shape for any consumer that's wired into them.
+ */
 import { DEFAULT_PLAN_LIMITS, type BillingState, type PlanLimits } from './types';
+import { getConfig } from '../core/config';
 
 function periodKey(now = new Date()): { start: number; end: number; key: string } {
   const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
@@ -10,81 +16,34 @@ function periodKey(now = new Date()): { start: number; end: number; key: string 
 }
 
 export function getPlanLimits(): PlanLimits {
-  const { billing } = getConfig();
-  if (!billing) return DEFAULT_PLAN_LIMITS.starter;
-  const base = DEFAULT_PLAN_LIMITS[billing.plan];
-  return { ...base, ...(billing.customLimits ?? {}) };
+  // v1.0.0 doesn't carry a per-call billing config on the client.
+  // Server is authoritative; this returns a safe default for any
+  // local guards a consumer might still call.
+  return DEFAULT_PLAN_LIMITS.starter;
 }
 
 export async function getBillingState(): Promise<BillingState> {
-  const { firestore, tenantId, billing } = getConfig();
-  const cols = getCollections();
-  const { start, end, key } = periodKey();
-  const ref = doc(firestore, cols.billing, `${tenantId}_${key}`);
-  const snap = await getDoc(ref);
-  const plan = billing?.plan ?? 'starter';
-  if (!snap.exists()) {
-    return {
-      tenantId,
-      plan,
-      periodStart: start,
-      periodEnd: end,
-      conversationsUsed: 0,
-      adminSeatsUsed: 0,
-      status: 'active',
-    };
+  const { start, end } = periodKey();
+  // We don't have tenant id on the client anymore (just the api_key);
+  // return an inert state.
+  let tenantId = '';
+  try {
+    tenantId = (getConfig() as unknown as { apiKey: string }).apiKey ?? '';
+  } catch {
+    /* not initialized — that's fine for this stub */
   }
-  const data = snap.data() as Partial<BillingState>;
   return {
     tenantId,
-    plan,
+    plan: 'starter',
     periodStart: start,
     periodEnd: end,
-    conversationsUsed: data.conversationsUsed ?? 0,
-    adminSeatsUsed: data.adminSeatsUsed ?? 0,
-    status: data.status ?? 'active',
+    conversationsUsed: 0,
+    adminSeatsUsed: 0,
+    status: 'active',
   };
 }
 
-export async function recordConversationStart(conversationId: string): Promise<void> {
-  const { firestore, tenantId, billing } = getConfig();
-  const cols = getCollections();
-  const { start, end, key } = periodKey();
-  const ref = doc(firestore, cols.billing, `${tenantId}_${key}`);
-  const limits = getPlanLimits();
-  const warnPct = billing?.warnAtPercent ?? 0.8;
-
-  const result = await runTransaction(firestore, async (tx) => {
-    const snap = await tx.get(ref);
-    const prev = snap.exists() ? (snap.data() as Partial<BillingState>) : {};
-    const seenIds: string[] = (prev as { seenConversations?: string[] }).seenConversations ?? [];
-    if (seenIds.includes(conversationId)) {
-      return { used: prev.conversationsUsed ?? 0, alreadyCounted: true };
-    }
-    const used = (prev.conversationsUsed ?? 0) + 1;
-    const status: BillingState['status'] = used > limits.conversationsPerMonth ? 'overage' : 'active';
-    tx.set(
-      ref,
-      {
-        tenantId,
-        plan: billing?.plan ?? 'starter',
-        periodStart: Timestamp.fromMillis(start),
-        periodEnd: Timestamp.fromMillis(end),
-        conversationsUsed: used,
-        seenConversations: [...seenIds, conversationId],
-        status,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true },
-    );
-    return { used, alreadyCounted: false };
-  });
-
-  if (result.alreadyCounted) return;
-  if (billing?.onApproachingQuota && result.used >= limits.conversationsPerMonth * warnPct && result.used <= limits.conversationsPerMonth) {
-    billing.onApproachingQuota(result.used, limits.conversationsPerMonth, warnPct);
-  }
-  if (billing?.onQuotaExceeded && result.used > limits.conversationsPerMonth) {
-    billing.onQuotaExceeded(result.used, limits.conversationsPerMonth);
-  }
+export async function recordConversationStart(_conversationId: string): Promise<void> {
+  // No-op — chat-admin counts conversations server-side via the
+  // POST /api/v1/conversations endpoint.
 }

@@ -1,6 +1,6 @@
 {
   "name": "@holylabs/chat-sdk-rn",
-  "version": "0.2.1",
+  "version": "1.0.0",
   "description": "React Native floating support widget for @holylabs/chat-sdk. Drop-in <SupportWidget /> with FAB + chatbox.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

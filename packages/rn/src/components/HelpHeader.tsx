@@ -210,7 +210,13 @@ const AgentStack: React.FC<{
             },
           ]}
         >
-          <Image source={agent.source} style={styles.agentImage} resizeMode="cover" />
+          {agent.icon ? (
+            // Custom-rendered avatar (vector icon, emoji, etc.) — center it
+            // inside the circle. Caller controls size + color of their icon.
+            <View style={styles.agentIconWrap}>{agent.icon}</View>
+          ) : agent.source ? (
+            <Image source={agent.source} style={styles.agentImage} resizeMode="cover" />
+          ) : null}
         </View>
       ))}
     </View>
@@ -308,6 +314,12 @@ const styles = StyleSheet.create({
   agentImage: {
     width: '100%',
     height: '100%',
+  },
+  agentIconWrap: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   heroTextBlock: {
     marginTop: 24,

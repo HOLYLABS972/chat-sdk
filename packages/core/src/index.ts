@@ -1,8 +1,30 @@
-// Public API for @holylabs/chat-sdk
+// Public API for @holylabs/chat-sdk v1.0.0
+//
+// Architecture: SDK talks to chat-admin REST + Supabase Realtime.
+// Firebase is no longer required on the consumer side. Order chats
+// are paused until the REST rewrite of those hooks lands.
 
 // Init / config
-export { initChatSDK, setCurrentUser, getConfig, isInitialized, DEFAULT_COLLECTIONS } from './core/config';
+export {
+  initChatSDK,
+  setCurrentUser,
+  getConfig,
+  getBaseUrl,
+  isInitialized,
+  DEFAULT_COLLECTIONS,
+} from './core/config';
 export type { ChatSDKConfig, CollectionPaths } from './core/config';
+
+// REST + Realtime under the hood — exported for advanced consumers
+// who want to call the API directly instead of via hooks.
+export { api, ApiError } from './api/client';
+export type {
+  ApiUser,
+  ApiConversation,
+  ApiMessage,
+  ApiConfig,
+} from './api/client';
+export { subscribeToConversation } from './api/realtime';
 
 // Types
 export type {

@@ -1,11 +1,10 @@
-import type { Timestamp } from 'firebase/firestore';
-
 export type ChatRole = 'customer' | 'driver' | 'admin' | 'support';
 
 export interface ChatUser {
   id: string;
   name: string;
-  role: ChatRole;
+  email?: string;
+  role?: ChatRole;
   avatarUrl?: string;
 }
 
@@ -17,7 +16,7 @@ export interface TicketMessage {
   senderRole: ChatRole;
   text?: string;
   imageUrl?: string;
-  createdAt: Timestamp | Date | number;
+  createdAt: Date | number;
   readBy?: string[];
 }
 
@@ -40,5 +39,5 @@ export interface OrderRef {
   status: OrderStatus;
   customerId: string;
   driverId?: string;
-  createdAt: Timestamp | Date | number;
+  createdAt: Date | number;
 }
