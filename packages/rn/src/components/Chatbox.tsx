@@ -356,7 +356,10 @@ const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ t
   }, [messages.length]);
 
   return (
-    <View style={{ flex: 1, paddingBottom: kbH > 0 ? kbH : 320 }}>
+    // paddingBottom matches the keyboard height when up, 0 otherwise.
+    // The previous 320 fallback made the panel "fly up" by 320-kbH
+    // every time the keyboard dismissed — visually jarring on iOS.
+    <View style={{ flex: 1, paddingBottom: kbH }}>
       {loading && messages.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator color={theme.primary} />
@@ -422,6 +425,13 @@ const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ t
           }}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          // Scroll to the latest message whenever the list height
+          // changes — fires on initial load (so the chat opens at the
+          // bottom) AND when a new message arrives. The useEffect-on-
+          // length pattern below was missing the very first render.
+          onContentSizeChange={() => {
+            listRef.current?.scrollToEnd({ animated: false });
+          }}
         />
       )}
       <MessageInput
