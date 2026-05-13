@@ -55,6 +55,10 @@ export interface ChatboxProps {
    *  to a native HubSpot SDK call, an external deep link, or anything
    *  else the host app wants. */
   onSendNewMessageOverride?: () => void;
+  /** When the modal opens (visible flips false→true), jump straight to
+   *  this view instead of resetting to landing. Used by SupportWidget's
+   *  openSignal/openTarget path. */
+  openTarget?: 'landing' | 'conversations' | 'support';
 }
 
 type ViewState =
@@ -84,6 +88,7 @@ export const Chatbox: React.FC<ChatboxProps> = ({
   labels: labelOverrides,
   isRTL = language === 'he',
   onSendNewMessageOverride,
+  openTarget,
 }) => {
   const handleSendNewMessage = () => {
     if (onSendNewMessageOverride) {
@@ -120,10 +125,19 @@ export const Chatbox: React.FC<ChatboxProps> = ({
     brand.logo || (brand.agents && brand.agents.length) || theme.primaryGradient,
   );
 
-  // Reset to landing each time the modal opens.
+  // On open: honor openTarget if the host provided one (e.g. notification
+  // tap → 'conversations'), otherwise default back to the FAQ landing
+  // screen so manual FAB opens behave as before.
   useEffect(() => {
-    if (visible) setView({ kind: 'landing' });
-  }, [visible]);
+    if (!visible) return;
+    if (openTarget === 'conversations') {
+      setView({ kind: 'conversations' });
+    } else if (openTarget === 'support') {
+      setView({ kind: 'support' });
+    } else {
+      setView({ kind: 'landing' });
+    }
+  }, [visible, openTarget]);
 
   const goBack = () => {
     if (view.kind === 'order-chat') {
