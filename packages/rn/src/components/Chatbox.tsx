@@ -8,6 +8,7 @@ import {
   Keyboard,
   Platform,
   ActivityIndicator,
+  Pressable,
   SafeAreaView as RNSafeAreaView,
 } from 'react-native';
 
@@ -177,17 +178,38 @@ export const Chatbox: React.FC<ChatboxProps> = ({
       visible={visible}
       animationType="slide"
       onRequestClose={onClose}
-      presentationStyle="pageSheet"
-      transparent={false}
+      // overFullScreen + transparent removes iOS's pageSheet frame so
+      // the chat slides up directly over the host screen (map stays
+      // visible behind the dim backdrop). Rounded top corners on the
+      // sheet itself give the bottom-sheet feel.
+      presentationStyle="overFullScreen"
+      transparent
+      statusBarTranslucent
     >
-      <View style={{ flex: 1, backgroundColor: theme.background }}>
-        {/* Top safe-area band: paint behind the status bar. In hero mode
-            on the landing screen we use the gradient's start color so it
-            blends into the header; otherwise it's the surface color so
-            we don't show a strip of an unexpected color above the bar. */}
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }}>
+        {/* Tap-to-dismiss backdrop above the sheet. */}
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <View
+          style={{
+            backgroundColor: theme.background,
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            // 85% screen height — leaves a strip of map visible above.
+            height: '85%',
+            overflow: 'hidden',
+          }}
+        >
+        {/* Drag handle for affordance — purely visual; tap-backdrop
+            still does the dismissing. */}
+        <View style={sheetStyles.handleWrap}>
+          <View style={[sheetStyles.handle, { backgroundColor: theme.border }]} />
+        </View>
+        {/* Top safe-area band moved into the sheet header below. In
+            hero mode on the landing screen we use the gradient's start
+            color so it blends into the header. */}
         {SafeAreaViewCtx ? (
           <SafeAreaViewCtx
-            edges={['top']}
+            edges={[]}
             style={{
               backgroundColor:
                 heroHeader && view.kind === 'landing'
@@ -277,10 +299,24 @@ export const Chatbox: React.FC<ChatboxProps> = ({
             <FaqArticleView theme={theme} item={view.item} />
           </ViewBoundary>
         )}
+        </View>
       </View>
     </Modal>
   );
 };
+
+const sheetStyles = StyleSheet.create({
+  handleWrap: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 6,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+  },
+});
 
 const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ theme, labels }) => {
   const {
