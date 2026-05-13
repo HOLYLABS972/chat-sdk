@@ -186,6 +186,18 @@ export const api = {
       body: args,
     }),
 
+  /** Fire-and-forget typing signal. Server broadcasts to the
+   *  conversation channel; consumers debounce their UI separately. */
+  setTyping: (
+    conversationId: string,
+    args: { sender_id: string; sender_name?: string },
+  ) =>
+    request<{ ok: true }>({
+      method: 'POST',
+      path: `/api/v1/conversations/${conversationId}/typing`,
+      body: args,
+    }),
+
   /** Upload an image attachment. Returns its public URL — caller then
    *  calls sendMessage({ media_url, message_type: 'image' }). Uses
    *  multipart/form-data so the regular JSON helper doesn't apply. */

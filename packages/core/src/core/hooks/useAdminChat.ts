@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, type ApiMessage } from '../../api/client';
+import { subscribeToTyping, type TypingEvent } from '../../api/realtime';
 import { getConfig, subscribeToConfigChanges } from '../config';
 
 // AppState is React Native only. Lazy-require so this SDK file still works
@@ -43,11 +44,24 @@ export interface AdminChatMessage {
   createdAt: number; // ms since epoch — matches the old SDK's shape
 }
 
+export interface TypingUser {
+  senderId: string;
+  senderName: string | null;
+  at: number;
+}
+
 export interface UseAdminChatResult {
   adminId: string | null;
   messages: AdminChatMessage[];
   loading: boolean;
   error: Error | null;
+  /** Users currently typing in this conversation, excluding the caller.
+   *  Each entry expires automatically ~3s after their last event. */
+  typingUsers: TypingUser[];
+  /** Notify other participants that the caller is typing. Throttled
+   *  to one broadcast per 2s internally — call freely on every
+   *  keystroke. */
+  setTyping: () => void;
   sendMessage: (text: string) => Promise<void>;
   /** Upload + send an image. `file` is the standard React Native
    *  { uri, name, type } shape from ImagePicker. */
@@ -95,12 +109,21 @@ const POLL_INTERVAL_MS = 5_000;
  * when the websocket failed transiently. Polling is simpler and lets
  * the backend swap data sources (Supabase ↔ HubSpot) transparently.
  */
+/** How long a typing entry stays in the list after the last event.
+ *  Standard chat UX is 3-5s; 3 feels snappy without flickering. */
+const TYPING_TTL_MS = 3500;
+/** Don't fire setTyping more often than this — broadcasts are cheap
+ *  but a key-per-char rate would hammer the realtime server. */
+const TYPING_THROTTLE_MS = 2000;
+
 export function useAdminChat(): UseAdminChatResult {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<AdminChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [cfgVersion, setCfgVersion] = useState(0);
+  const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
+  const lastTypingSentRef = useRef(0);
 
   // Bump cfgVersion whenever initChatSDK or setCurrentUser fires so
   // the subscription effect re-runs with the new identity.
@@ -244,6 +267,54 @@ export function useAdminChat(): UseAdminChatResult {
     };
   }, [conversationId, refresh]);
 
+  // Subscribe to typing events. Filter out our own (echo from the
+  // broadcast) and expire entries after TYPING_TTL_MS so the indicator
+  // hides if the other side stops typing without sending an explicit
+  // "stopped" event.
+  useEffect(() => {
+    if (!conversationId) return;
+    const myId = getConfig().currentUser.id;
+    const unsub = subscribeToTyping(conversationId, (ev: TypingEvent) => {
+      if (ev.senderId === myId) return;
+      setTypingUsers((prev) => {
+        const without = prev.filter((p) => p.senderId !== ev.senderId);
+        return [...without, ev];
+      });
+    });
+    // Periodic sweep — drop entries that haven't been refreshed in
+    // TYPING_TTL_MS. Cheap; runs once per second.
+    const sweep = setInterval(() => {
+      const cutoff = Date.now() - TYPING_TTL_MS;
+      setTypingUsers((prev) => {
+        const next = prev.filter((p) => p.at > cutoff);
+        return next.length === prev.length ? prev : next;
+      });
+    }, 1000);
+    return () => {
+      unsub();
+      clearInterval(sweep);
+    };
+  }, [conversationId]);
+
+  const setTyping = useCallback(() => {
+    const convId = convIdRef.current;
+    if (!convId) return;
+    const now = Date.now();
+    if (now - lastTypingSentRef.current < TYPING_THROTTLE_MS) return;
+    lastTypingSentRef.current = now;
+    const cfg = getConfig();
+    const userId = cfg.currentUser.id;
+    if (!userId) return;
+    api
+      .setTyping(convId, {
+        sender_id: userId,
+        sender_name: cfg.currentUser.name,
+      })
+      .catch(() => {
+        /* typing is non-critical; ignore */
+      });
+  }, []);
+
   const sendMessage = useCallback(async (text: string) => {
     const convId = convIdRef.current;
     if (!convId) throw new Error('support conversation not ready yet');
@@ -323,6 +394,8 @@ export function useAdminChat(): UseAdminChatResult {
     messages,
     loading,
     error,
+    typingUsers,
+    setTyping,
     sendMessage,
     sendImage,
     editMessage,

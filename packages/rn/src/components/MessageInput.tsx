@@ -10,6 +10,9 @@ export interface MessageInputProps {
    *  with the picked file in the React Native `{ uri, name, type }`
    *  shape so callers can hand it straight to the upload helper. */
   onSendImage?: (file: { uri: string; name: string; type: string }) => void | Promise<void>;
+  /** Optional: called on every text change. Use to fire typing
+   *  broadcasts; the hook caller is expected to throttle. */
+  onTyping?: () => void;
   placeholder?: string;
   disabled?: boolean;
   disabledReason?: string;
@@ -22,6 +25,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   theme,
   onSend,
   onSendImage,
+  onTyping,
   placeholder,
   disabled = false,
   disabledReason,
@@ -152,7 +156,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       <TextInput
         ref={inputRef}
         value={value}
-        onChangeText={setValue}
+        onChangeText={(t) => {
+          setValue(t);
+          if (t.length > 0) onTyping?.();
+        }}
         placeholder={placeholderText}
         placeholderTextColor={theme.textSecondary}
         multiline

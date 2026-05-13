@@ -247,6 +247,8 @@ const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ t
     loading,
     error,
     adminId,
+    typingUsers,
+    setTyping,
   } = useAdminChat();
   const listRef = useRef<FlatList<unknown> | null>(null);
   const [kbH, setKbH] = useState(0);
@@ -434,6 +436,14 @@ const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ t
           }}
         />
       )}
+      {typingUsers.length > 0 && (
+        <View style={typingIndicatorStyles.row}>
+          <Text style={[typingIndicatorStyles.text, { color: theme.textSecondary }]}>
+            {typingUsers[0].senderName ?? 'Support'} is typing…
+          </Text>
+        </View>
+      )}
+
       <MessageInput
         theme={theme}
         labels={labels}
@@ -444,10 +454,22 @@ const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ t
         onSendImage={async (file) => {
           await sendImage(file);
         }}
+        onTyping={setTyping}
       />
     </View>
   );
 };
+
+const typingIndicatorStyles = StyleSheet.create({
+  row: {
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
+  text: {
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+});
 
 // FAQ defaults moved to ../i18n.ts (role + language aware).
 

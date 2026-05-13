@@ -96,6 +96,54 @@ export function subscribeToConversation(
   };
 }
 
+/**
+ * Subscribe to `typing` broadcasts on a conversation. onTyping fires
+ * each time someone sends a typing signal. Caller is responsible for
+ * timing out stale typers (recommended: clear ~3s after the last
+ * event for a given senderId).
+ */
+export interface TypingEvent {
+  senderId: string;
+  senderName: string | null;
+  at: number;
+}
+
+export function subscribeToTyping(
+  conversationId: string,
+  onTyping: (ev: TypingEvent) => void,
+): () => void {
+  let unsubscribed = false;
+  let channel: ReturnType<SupabaseClientLike['channel']> | null = null;
+
+  (async () => {
+    const client = await getOrCreateClient();
+    if (!client || unsubscribed) return;
+    channel = client.channel(`conv:${conversationId}`);
+    try {
+      channel
+        .on('broadcast', { event: 'typing' }, ({ payload }) => {
+          const p = payload as Partial<TypingEvent> | undefined;
+          if (!p?.senderId) return;
+          onTyping({
+            senderId: p.senderId,
+            senderName: p.senderName ?? null,
+            at: p.at ?? Date.now(),
+          });
+        })
+        .subscribe();
+    } catch {
+      // Typing is non-critical; silently degrade.
+    }
+  })();
+
+  return () => {
+    unsubscribed = true;
+    if (channel && _client) {
+      _client.removeChannel(channel).catch(() => {});
+    }
+  };
+}
+
 /** Reset cached state — useful in tests, and after a tenant switch. */
 export function _resetRealtimeForTests(): void {
   _client = null;
