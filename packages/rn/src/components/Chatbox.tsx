@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, Component } from 'react';
 import {
   Modal,
   View,
@@ -39,6 +39,26 @@ import { FaqArticleView } from './FaqArticleView';
 import { ConversationsListView } from './ConversationsListView';
 import { OrderChatView } from './OrderChatView';
 import { defaultFaq, getLabels, type Lang, type WidgetLabels } from '../i18n';
+
+/** Per-view boundary so a render crash in one view doesn't take down
+ *  the entire Chatbox. Also tags the console.error with the view name
+ *  so we know which one to blame. */
+class ViewBoundary extends Component<
+  { children: React.ReactNode; viewName: string },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: unknown, info: unknown) {
+    console.error(`[chat-sdk-rn] view '${this.props.viewName}' crashed:`, error, info);
+  }
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
 
 export interface ChatboxProps {
   visible: boolean;
@@ -201,51 +221,57 @@ export const Chatbox: React.FC<ChatboxProps> = ({
         )}
 
         {view.kind === 'landing' && (
-          <LandingView
-            theme={theme}
-            greeting={brand.greeting}
-            hideGreeting={heroHeader}
-            faq={effectiveFaq}
-            // Wrap each quick link so tapping closes the modal first; otherwise
-            // the destination screen renders behind the still-open chatbox and
-            // looks like nothing happened.
-            quickLinks={quickLinks?.map((link) => ({
-              ...link,
-              onPress: () => {
-                onClose();
-                // Defer so the modal is fully dismissed before nav fires —
-                // some routers swallow pushes during a presentation transition.
-                setTimeout(() => link.onPress(), 0);
-              },
-            }))}
-            labels={labels}
-            isRTL={isRTL}
-            onOpenMessages={() => setView({ kind: 'conversations' })}
-            onOpenFaq={(item) => setView({ kind: 'faq', item })}
-            onSendNewMessage={handleSendNewMessage}
-            // When the host overrides "Send new message" (e.g. routes to a
-            // native SDK like HubSpot), there's no in-app message history
-            // to show — hide the Messages card so only the CTA remains.
-            hideMessagesCard={!!onSendNewMessageOverride}
-          />
+          <ViewBoundary viewName="landing">
+            <LandingView
+              theme={theme}
+              greeting={brand.greeting}
+              hideGreeting={heroHeader}
+              faq={effectiveFaq}
+              quickLinks={quickLinks?.map((link) => ({
+                ...link,
+                onPress: () => {
+                  onClose();
+                  setTimeout(() => link.onPress(), 0);
+                },
+              }))}
+              labels={labels}
+              isRTL={isRTL}
+              onOpenMessages={() => setView({ kind: 'conversations' })}
+              onOpenFaq={(item) => setView({ kind: 'faq', item })}
+              onSendNewMessage={handleSendNewMessage}
+              hideMessagesCard={!!onSendNewMessageOverride}
+            />
+          </ViewBoundary>
         )}
 
         {view.kind === 'conversations' && (
-          <ConversationsListView
-            theme={theme}
-            labels={labels}
-            onOpenOrderChat={(orderId) => setView({ kind: 'order-chat', orderId })}
-            onSendNewMessage={handleSendNewMessage}
-          />
+          <ViewBoundary viewName="conversations">
+            <ConversationsListView
+              theme={theme}
+              labels={labels}
+              onOpenOrderChat={(orderId) => setView({ kind: 'order-chat', orderId })}
+              onSendNewMessage={handleSendNewMessage}
+            />
+          </ViewBoundary>
         )}
 
         {view.kind === 'order-chat' && (
-          <OrderChatView theme={theme} orderId={view.orderId} labels={labels} />
+          <ViewBoundary viewName="order-chat">
+            <OrderChatView theme={theme} orderId={view.orderId} labels={labels} />
+          </ViewBoundary>
         )}
 
-        {view.kind === 'support' && <SupportChat theme={theme} labels={labels} />}
+        {view.kind === 'support' && (
+          <ViewBoundary viewName="support">
+            <SupportChat theme={theme} labels={labels} />
+          </ViewBoundary>
+        )}
 
-        {view.kind === 'faq' && <FaqArticleView theme={theme} item={view.item} />}
+        {view.kind === 'faq' && (
+          <ViewBoundary viewName="faq">
+            <FaqArticleView theme={theme} item={view.item} />
+          </ViewBoundary>
+        )}
       </View>
     </Modal>
   );
