@@ -78,7 +78,9 @@ export interface ChatboxProps {
   /** When the modal opens (visible flips false→true), jump straight to
    *  this view instead of resetting to landing. Used by SupportWidget's
    *  openSignal/openTarget path. */
-  openTarget?: 'landing' | 'conversations' | 'support';
+  openTarget?: 'landing' | 'conversations' | 'support' | 'order-chat';
+  /** When openTarget === 'order-chat', the order id to deep-link to. */
+  openOrderId?: string;
 }
 
 type ViewState =
@@ -109,6 +111,7 @@ export const Chatbox: React.FC<ChatboxProps> = ({
   isRTL = language === 'he',
   onSendNewMessageOverride,
   openTarget,
+  openOrderId,
 }) => {
   const handleSendNewMessage = () => {
     if (onSendNewMessageOverride) {
@@ -150,14 +153,16 @@ export const Chatbox: React.FC<ChatboxProps> = ({
   // screen so manual FAB opens behave as before.
   useEffect(() => {
     if (!visible) return;
-    if (openTarget === 'conversations') {
+    if (openTarget === 'order-chat' && openOrderId) {
+      setView({ kind: 'order-chat', orderId: openOrderId });
+    } else if (openTarget === 'conversations') {
       setView({ kind: 'conversations' });
     } else if (openTarget === 'support') {
       setView({ kind: 'support' });
     } else {
       setView({ kind: 'landing' });
     }
-  }, [visible, openTarget]);
+  }, [visible, openTarget, openOrderId]);
 
   const goBack = () => {
     if (view.kind === 'order-chat') {

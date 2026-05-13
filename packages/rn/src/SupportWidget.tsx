@@ -44,8 +44,13 @@ export interface SupportWidgetProps {
    *  user expects to see their conversations, not browse help.
    *  `'conversations'` shows the messages list,
    *  `'support'` jumps into the admin/support chat directly,
+   *  `'order-chat'` jumps into a specific order's chat — requires
+   *  `openOrderId`,
    *  `'landing'` (default) keeps the FAQ landing screen. */
-  openTarget?: 'landing' | 'conversations' | 'support';
+  openTarget?: 'landing' | 'conversations' | 'support' | 'order-chat';
+  /** When `openTarget === 'order-chat'`, the order id to deep-link to.
+   *  Ignored for other targets. */
+  openOrderId?: string;
 }
 
 /**
@@ -74,14 +79,18 @@ export const SupportWidget: React.FC<SupportWidgetProps> = ({
   onSendNewMessageOverride,
   openSignal,
   openTarget,
+  openOrderId,
 }) => {
   const [open, setOpen] = useState(false);
   // Capture which view the host asked us to open on. Increments alongside
   // openSignal so Chatbox can read it on its next visible→true transition
   // without us threading openTarget through as part of internal state.
   const [externalOpenTarget, setExternalOpenTarget] = useState<
-    'landing' | 'conversations' | 'support' | undefined
+    'landing' | 'conversations' | 'support' | 'order-chat' | undefined
   >(undefined);
+  const [externalOpenOrderId, setExternalOpenOrderId] = useState<string | undefined>(
+    undefined,
+  );
 
   // External "open now" trigger. Watch openSignal — any change opens
   // the widget. We don't auto-close on change-back so the user can
@@ -89,10 +98,11 @@ export const SupportWidget: React.FC<SupportWidgetProps> = ({
   useEffect(() => {
     if (openSignal === undefined) return;
     setExternalOpenTarget(openTarget);
+    setExternalOpenOrderId(openOrderId);
     setOpen(true);
     onOpen?.();
-    // openTarget intentionally not in deps — we read its current value
-    // at the moment a signal fires.
+    // openTarget/openOrderId intentionally not in deps — we read their
+    // current values at the moment a signal fires.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openSignal, onOpen]);
   const merged = mergeTheme(isDark ? DEFAULT_DARK_THEME : DEFAULT_LIGHT_THEME, theme);
@@ -102,6 +112,7 @@ export const SupportWidget: React.FC<SupportWidgetProps> = ({
   const handleOpen = () => {
     // Manual FAB tap — always reset to the default landing.
     setExternalOpenTarget(undefined);
+    setExternalOpenOrderId(undefined);
     setOpen(true);
     onOpen?.();
   };
@@ -132,6 +143,7 @@ export const SupportWidget: React.FC<SupportWidgetProps> = ({
         isRTL={isRTL ?? language === 'he'}
         onSendNewMessageOverride={onSendNewMessageOverride}
         openTarget={externalOpenTarget}
+        openOrderId={externalOpenOrderId}
       />
     </>
   );
