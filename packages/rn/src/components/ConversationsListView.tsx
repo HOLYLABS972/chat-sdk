@@ -128,7 +128,9 @@ const Row: React.FC<{ item: OrderConversationRow; theme: WidgetTheme; onPress: (
           >
             {item.lastMessage || 'Tap to open chat'}
           </Text>
-          {item.unread && <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />}
+          {item.unread ? (
+            <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />
+          ) : null}
         </View>
       </View>
     </Pressable>
