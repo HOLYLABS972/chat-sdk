@@ -5,7 +5,7 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ActivityIndicator,
   SafeAreaView as RNSafeAreaView,
@@ -50,6 +50,11 @@ export interface ChatboxProps {
   language?: Lang;
   labels?: Partial<WidgetLabels>;
   isRTL?: boolean;
+  /** When set, the "Send new message" CTA closes the widget and fires
+   *  this callback instead of opening the built-in admin chat. Wire it
+   *  to a native HubSpot SDK call, an external deep link, or anything
+   *  else the host app wants. */
+  onSendNewMessageOverride?: () => void;
 }
 
 type ViewState =
@@ -78,7 +83,24 @@ export const Chatbox: React.FC<ChatboxProps> = ({
   language = 'en',
   labels: labelOverrides,
   isRTL = language === 'he',
+  onSendNewMessageOverride,
 }) => {
+  const handleSendNewMessage = () => {
+    if (onSendNewMessageOverride) {
+      // Don't dismiss our own modal first. Closing the RCTModalHostViewController
+      // and then trying to present another native sheet hits the iOS error
+      // "whose view is not in the window hierarchy" because RN's modal
+      // teardown is asynchronous and the topmost view controller is mid-
+      // dismiss when the override fires. Instead, leave our modal open
+      // and let the host stack its own presentation on top — iOS supports
+      // modal-on-modal stacking. When the user closes the HubSpot sheet
+      // they're back in our FAQ landing; the X in our header still closes
+      // everything.
+      onSendNewMessageOverride();
+      return;
+    }
+    setView({ kind: 'support' });
+  };
   const [view, setView] = useState<ViewState>({ kind: 'landing' });
   const labels = getLabels(language, labelOverrides);
   // Role-aware default FAQ in the active language. Consumer-supplied `faq`
@@ -186,7 +208,11 @@ export const Chatbox: React.FC<ChatboxProps> = ({
             isRTL={isRTL}
             onOpenMessages={() => setView({ kind: 'conversations' })}
             onOpenFaq={(item) => setView({ kind: 'faq', item })}
-            onSendNewMessage={() => setView({ kind: 'support' })}
+            onSendNewMessage={handleSendNewMessage}
+            // When the host overrides "Send new message" (e.g. routes to a
+            // native SDK like HubSpot), there's no in-app message history
+            // to show — hide the Messages card so only the CTA remains.
+            hideMessagesCard={!!onSendNewMessageOverride}
           />
         )}
 
@@ -195,7 +221,7 @@ export const Chatbox: React.FC<ChatboxProps> = ({
             theme={theme}
             labels={labels}
             onOpenOrderChat={(orderId) => setView({ kind: 'order-chat', orderId })}
-            onSendNewMessage={() => setView({ kind: 'support' })}
+            onSendNewMessage={handleSendNewMessage}
           />
         )}
 
@@ -214,6 +240,17 @@ export const Chatbox: React.FC<ChatboxProps> = ({
 const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ theme, labels }) => {
   const { messages, sendMessage, loading, error, adminId } = useAdminChat();
   const listRef = useRef<FlatList<unknown> | null>(null);
+  const [kbH, setKbH] = useState(0);
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const s = Keyboard.addListener(showEvt, (e) => setKbH(e?.endCoordinates?.height ?? 0));
+    const h = Keyboard.addListener(hideEvt, () => setKbH(0));
+    return () => {
+      s.remove();
+      h.remove();
+    };
+  }, []);
   const currentUserId = (() => {
     try {
       return getConfig().currentUser.id;
@@ -229,12 +266,15 @@ const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ t
   }, [messages.length]);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={{ flex: 1, paddingBottom: kbH > 0 ? kbH : 320 }}>
       {loading && messages.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator color={theme.primary} />
         </View>
-      ) : error ? (
+      ) : messages.length === 0 && error ? (
+        // Show the "couldn't load" state ONLY when we have nothing to
+        // render. If history is already loaded, a transient poll error
+        // shouldn't hide the messages — useAdminChat keeps retrying.
         <View style={styles.center}>
           <Text style={[styles.errorText, { color: theme.textSecondary }]}>
             {labels.couldNotLoadMessages}
@@ -274,11 +314,12 @@ const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ t
       <MessageInput
         theme={theme}
         labels={labels}
+        autoFocus
         onSend={async (text) => {
           await sendMessage(text);
         }}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 

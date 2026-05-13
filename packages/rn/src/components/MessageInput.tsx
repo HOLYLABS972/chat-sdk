@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, TextInput, Pressable, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, TextInput, Pressable, Text, StyleSheet, ActivityIndicator, InteractionManager } from 'react-native';
 import type { WidgetTheme } from '../theme';
 import type { WidgetLabels } from '../i18n';
 
@@ -10,6 +10,8 @@ export interface MessageInputProps {
   disabled?: boolean;
   disabledReason?: string;
   labels?: WidgetLabels;
+  /** Focus the input on mount so the keyboard opens immediately. */
+  autoFocus?: boolean;
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
@@ -19,7 +21,22 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   disabled = false,
   disabledReason,
   labels,
+  autoFocus = false,
 }) => {
+  const inputRef = useRef<TextInput | null>(null);
+  const hasAutoFocusedRef = useRef(false);
+  // iOS won't honor autoFocus / focus() on a multiline TextInput until it
+  // is actually laid out (and the parent modal animation has settled). We
+  // hook into onLayout to trigger focus exactly once, plus add a delayed
+  // safety net in case onLayout fires too early.
+  const handleAutoFocus = () => {
+    if (!autoFocus || disabled || hasAutoFocusedRef.current) return;
+    hasAutoFocusedRef.current = true;
+    const doFocus = () => inputRef.current?.focus();
+    setTimeout(doFocus, 50);
+    setTimeout(doFocus, 350);
+    setTimeout(doFocus, 800);
+  };
   const placeholderText = placeholder ?? labels?.typeMessage ?? 'Type a message…';
   const sendText = labels?.send ?? 'Send';
   const [value, setValue] = useState('');
@@ -50,12 +67,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   return (
     <View style={[styles.row, { borderTopColor: theme.border, backgroundColor: theme.background }]}>
       <TextInput
+        ref={inputRef}
         value={value}
         onChangeText={setValue}
         placeholder={placeholderText}
         placeholderTextColor={theme.textSecondary}
         multiline
-        editable={!disabled && !sending}
+        autoFocus={autoFocus && !disabled}
+        editable={!disabled}
+        onLayout={handleAutoFocus}
         style={[
           styles.input,
           { color: theme.textPrimary, backgroundColor: theme.surface, borderColor: theme.border },
@@ -63,6 +83,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       />
       <Pressable
         onPress={submit}
+        // Pressables steal first-responder on iOS by default which blurs the
+        // TextInput and dismisses the keyboard. We block that here.
+        onPressIn={() => inputRef.current?.focus()}
         disabled={!value.trim() || sending || disabled}
         accessibilityLabel="Send message"
         style={({ pressed }) => [
@@ -76,7 +99,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         {sending ? (
           <ActivityIndicator size="small" color={theme.primaryText} />
         ) : (
-          <Text style={[styles.sendText, { color: theme.primaryText }]}>{sendText}</Text>
+          // Direction-neutral up-arrow — same glyph iMessage / WhatsApp /
+          // Telegram use for the send affordance. Keeps the SDK
+          // icon-library-free (no react-native-vector-icons peer dep).
+          <Text
+            accessibilityLabel={sendText}
+            style={[styles.sendIcon, { color: theme.primaryText }]}
+          >
+            ↑
+          </Text>
         )}
       </Pressable>
     </View>
@@ -104,7 +135,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   sendBtn: {
-    paddingHorizontal: 16,
+    width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: 'center',
@@ -113,6 +144,14 @@ const styles = StyleSheet.create({
   sendText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  sendIcon: {
+    fontSize: 22,
+    fontWeight: '700',
+    // Glyph sits a hair below center in most fonts — lift it by a pixel
+    // for visual balance against the input's vertical midline.
+    lineHeight: 22,
+    marginTop: -1,
   },
   disabled: {
     paddingVertical: 14,

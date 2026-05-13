@@ -22,6 +22,11 @@ export interface LandingViewProps {
   onOpenFaq: (item: FaqItem) => void;
   /** Tap on the "Send us a message" CTA → 1:1 admin/support chat. */
   onSendNewMessage: () => void;
+  /** When true, the Messages card (recent conversations list) is hidden,
+   *  leaving only the "Send us a message" CTA. Useful when the host app
+   *  delegates the chat experience to a native SDK and doesn't keep its
+   *  own message history. */
+  hideMessagesCard?: boolean;
 }
 
 export const LandingView: React.FC<LandingViewProps> = ({
@@ -35,6 +40,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
   onOpenMessages,
   onOpenFaq,
   onSendNewMessage,
+  hideMessagesCard = false,
 }) => {
   const [search, setSearch] = useState('');
 
@@ -60,26 +66,29 @@ export const LandingView: React.FC<LandingViewProps> = ({
         </Text>
       )}
 
-      {/* Action cards: Messages + Help */}
-      <View style={[styles.actionCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
-        <Pressable
-          onPress={onOpenMessages}
-          accessibilityLabel={labels.messagesCard}
-          style={({ pressed }) => [styles.actionRow, { opacity: pressed ? 0.7 : 1 }]}
-        >
-          <Text style={[styles.actionLabel, { color: theme.textPrimary }]}>{labels.messagesCard}</Text>
-          <View style={styles.actionRight}>
-            {unreadMessages !== undefined && unreadMessages > 0 && (
-              <View style={[styles.badge, { backgroundColor: theme.primary }]}>
-                <Text style={[styles.badgeText, { color: theme.primaryText }]}>
-                  {unreadMessages > 99 ? '99+' : String(unreadMessages)}
-                </Text>
-              </View>
-            )}
-            <Text style={[styles.chev, { color: theme.textSecondary }]}>›</Text>
-          </View>
-        </Pressable>
-      </View>
+      {/* Recent conversations card — suppressed when the host app
+          delegates chat to a native SDK that owns its own history. */}
+      {!hideMessagesCard && (
+        <View style={[styles.actionCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
+          <Pressable
+            onPress={onOpenMessages}
+            accessibilityLabel={labels.messagesCard}
+            style={({ pressed }) => [styles.actionRow, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Text style={[styles.actionLabel, { color: theme.textPrimary }]}>{labels.messagesCard}</Text>
+            <View style={styles.actionRight}>
+              {unreadMessages !== undefined && unreadMessages > 0 && (
+                <View style={[styles.badge, { backgroundColor: theme.primary }]}>
+                  <Text style={[styles.badgeText, { color: theme.primaryText }]}>
+                    {unreadMessages > 99 ? '99+' : String(unreadMessages)}
+                  </Text>
+                </View>
+              )}
+              <Text style={[styles.chev, { color: theme.textSecondary }]}>›</Text>
+            </View>
+          </Pressable>
+        </View>
+      )}
 
       {/* CTA: starts a fresh support conversation (admin/support chat) */}
       <Pressable

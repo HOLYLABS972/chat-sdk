@@ -6,6 +6,12 @@ export interface ChatUser {
   email?: string;
   role?: ChatRole;
   avatarUrl?: string;
+  /** FCM registration tokens for this user's device(s). Forwarded to
+   *  chat-admin on upsert so the backend can fan out push
+   *  notifications without needing to look up tokens elsewhere
+   *  (Firestore, etc.). Multiple entries are fine — chat-admin
+   *  de-dupes on insert. */
+  fcmTokens?: string[];
 }
 
 export interface TicketMessage {

@@ -1,10 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ActivityIndicator,
 } from 'react-native';
@@ -25,6 +25,17 @@ export const OrderChatView: React.FC<OrderChatViewProps> = ({ theme, orderId, re
   const L = labels;
   const { messages, sendMessage, loading, error } = useOrderChat(orderId);
   const listRef = useRef<FlatList<unknown> | null>(null);
+  const [kbH, setKbH] = useState(0);
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const s = Keyboard.addListener(showEvt, (e) => setKbH(e?.endCoordinates?.height ?? 0));
+    const h = Keyboard.addListener(hideEvt, () => setKbH(0));
+    return () => {
+      s.remove();
+      h.remove();
+    };
+  }, []);
   const currentUserId = (() => {
     try {
       return getConfig().currentUser.id;
@@ -40,12 +51,15 @@ export const OrderChatView: React.FC<OrderChatViewProps> = ({ theme, orderId, re
   }, [messages.length]);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={{ flex: 1, paddingBottom: kbH > 0 ? kbH : 320 }}>
       {loading && messages.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator color={theme.primary} />
         </View>
-      ) : error ? (
+      ) : messages.length === 0 && error ? (
+        // Only blank the list when we truly have nothing to show.
+        // Once messages are loaded a transient poll/realtime failure
+        // shouldn't hide them — the next refresh will catch up.
         <View style={styles.center}>
           <Text style={[styles.errorText, { color: theme.textSecondary }]}>
             {L?.couldNotLoadMessages ?? "Couldn't load messages."}
@@ -87,11 +101,12 @@ export const OrderChatView: React.FC<OrderChatViewProps> = ({ theme, orderId, re
       )}
       <MessageInput
         theme={theme}
+        autoFocus
         onSend={async (text) => {
           await sendMessage(text, receiverId ? { receiverId } : undefined);
         }}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 

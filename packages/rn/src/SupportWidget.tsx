@@ -30,6 +30,10 @@ export interface SupportWidgetProps {
   hidden?: boolean;
   onOpen?: () => void;
   onClose?: () => void;
+  /** When set, "Send new message" closes the widget and fires this
+   *  callback instead of opening the built-in admin chat. Use this to
+   *  hand off to a native chat SDK, an external deep link, etc. */
+  onSendNewMessageOverride?: () => void;
 }
 
 /**
@@ -55,6 +59,7 @@ export const SupportWidget: React.FC<SupportWidgetProps> = ({
   hidden = false,
   onOpen,
   onClose,
+  onSendNewMessageOverride,
 }) => {
   const [open, setOpen] = useState(false);
   const merged = mergeTheme(isDark ? DEFAULT_DARK_THEME : DEFAULT_LIGHT_THEME, theme);
@@ -90,6 +95,7 @@ export const SupportWidget: React.FC<SupportWidgetProps> = ({
         language={language}
         labels={labels}
         isRTL={isRTL ?? language === 'he'}
+        onSendNewMessageOverride={onSendNewMessageOverride}
       />
     </>
   );
