@@ -35,6 +35,11 @@ export interface AdminChatMessage {
   senderUid: string;
   receiverId: string | null;
   message: string;
+  /** Image URL when messageType === 'image'. */
+  mediaUrl: string | null;
+  messageType: 'text' | 'image' | 'file' | 'system';
+  /** Set when the message has been edited at least once. */
+  editedAt: number | null;
   createdAt: number; // ms since epoch — matches the old SDK's shape
 }
 
@@ -44,6 +49,14 @@ export interface UseAdminChatResult {
   loading: boolean;
   error: Error | null;
   sendMessage: (text: string) => Promise<void>;
+  /** Upload + send an image. `file` is the standard React Native
+   *  { uri, name, type } shape from ImagePicker. */
+  sendImage: (file: { uri: string; name: string; type: string }) => Promise<void>;
+  /** Edit an existing message body. Only succeeds on the caller's own
+   *  messages (server-side check). */
+  editMessage: (msgId: string, body: string) => Promise<void>;
+  /** Soft-delete a message. Only succeeds on the caller's own messages. */
+  deleteMessage: (msgId: string) => Promise<void>;
   /** Refetch message history. Safe to call any time. */
   refresh: () => Promise<void>;
 }
@@ -55,6 +68,9 @@ function toAdminMessage(m: ApiMessage): AdminChatMessage {
     senderUid: m.sender_id,
     receiverId: m.receiver_id,
     message: m.body ?? '',
+    mediaUrl: m.media_url ?? null,
+    messageType: m.message_type,
+    editedAt: m.edited_at ? new Date(m.edited_at).getTime() : null,
     createdAt: new Date(m.created_at).getTime(),
   };
 }
@@ -239,12 +255,68 @@ export function useAdminChat(): UseAdminChatResult {
       body: text,
     });
     // Append the just-sent message immediately so the UI feels snappy.
-    // The next poll will reconcile against HubSpot's canonical copy;
-    // we de-dup by id so no double-rendering.
     setMessages((prev) =>
       prev.some((m) => m.id === message.id) ? prev : [...prev, toAdminMessage(message)],
     );
   }, []);
+
+  /** Upload an image and send it as an image-type message. The file
+   *  spec is the React Native `{ uri, name, type }` shape from
+   *  ImagePicker / DocumentPicker; on web you'd build it the same way
+   *  from a File via URL.createObjectURL. */
+  const sendImage = useCallback(
+    async (file: { uri: string; name: string; type: string }) => {
+      const convId = convIdRef.current;
+      if (!convId) throw new Error('support conversation not ready yet');
+      const cfg = getConfig();
+      const userId = cfg.currentUser.id;
+      if (!userId) throw new Error('no current user');
+      const { url } = await api.uploadAttachment(convId, file);
+      const { message } = await api.sendMessage(convId, {
+        sender_id: userId,
+        media_url: url,
+        message_type: 'image',
+      });
+      setMessages((prev) =>
+        prev.some((m) => m.id === message.id)
+          ? prev
+          : [...prev, toAdminMessage(message)],
+      );
+    },
+    [],
+  );
+
+  const editMessage = useCallback(async (msgId: string, body: string) => {
+    const convId = convIdRef.current;
+    if (!convId) throw new Error('support conversation not ready yet');
+    const cfg = getConfig();
+    const userId = cfg.currentUser.id;
+    if (!userId) throw new Error('no current user');
+    const { message } = await api.editMessage(convId, msgId, {
+      sender_id: userId,
+      body,
+    });
+    setMessages((prev) =>
+      prev.map((m) => (m.id === msgId ? toAdminMessage(message) : m)),
+    );
+  }, []);
+
+  const deleteMessage = useCallback(async (msgId: string) => {
+    const convId = convIdRef.current;
+    if (!convId) throw new Error('support conversation not ready yet');
+    const cfg = getConfig();
+    const userId = cfg.currentUser.id;
+    if (!userId) throw new Error('no current user');
+    // Optimistic: hide the row immediately.
+    const before = messages;
+    setMessages((cur) => cur.filter((m) => m.id !== msgId));
+    try {
+      await api.deleteMessage(convId, msgId, { sender_id: userId });
+    } catch (err) {
+      setMessages(before); // rollback
+      throw err;
+    }
+  }, [messages]);
 
   return {
     adminId: conversationId,
@@ -252,6 +324,9 @@ export function useAdminChat(): UseAdminChatResult {
     loading,
     error,
     sendMessage,
+    sendImage,
+    editMessage,
+    deleteMessage,
     refresh,
   };
 }

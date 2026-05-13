@@ -238,9 +238,99 @@ export const Chatbox: React.FC<ChatboxProps> = ({
 };
 
 const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ theme, labels }) => {
-  const { messages, sendMessage, loading, error, adminId } = useAdminChat();
+  const {
+    messages,
+    sendMessage,
+    sendImage,
+    editMessage,
+    deleteMessage,
+    loading,
+    error,
+    adminId,
+  } = useAdminChat();
   const listRef = useRef<FlatList<unknown> | null>(null);
   const [kbH, setKbH] = useState(0);
+  // Long-press action target: which of the user's own messages has its
+  // edit/delete menu open. null = none.
+  const [actionFor, setActionFor] = useState<{
+    id: string;
+    body: string;
+    hasImage: boolean;
+  } | null>(null);
+
+  // When actionFor is set, surface a native Alert with Edit / Delete.
+  // Alert.prompt is iOS-only — Android users get a Delete-only flow
+  // for now since a custom modal is more code than is worth here.
+  useEffect(() => {
+    if (!actionFor) return;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Alert, Platform } = require('react-native') as {
+      Alert: {
+        alert: (title: string, message: string | undefined, buttons: Array<{
+          text: string;
+          style?: 'default' | 'cancel' | 'destructive';
+          onPress?: () => void;
+        }>) => void;
+        prompt?: (title: string, message: string | undefined, callback: (value: string) => void, type?: string, defaultValue?: string) => void;
+      };
+      Platform: { OS: string };
+    };
+    const target = actionFor;
+    const closeMenu = () => setActionFor(null);
+
+    const promptForEdit = () => {
+      if (target.hasImage) return; // images don't have an editable body
+      if (Platform.OS === 'ios' && Alert.prompt) {
+        Alert.prompt(
+          'Edit message',
+          undefined,
+          (value: string) => {
+            const trimmed = (value ?? '').trim();
+            if (trimmed && trimmed !== target.body) {
+              void editMessage(target.id, trimmed);
+            }
+          },
+          'plain-text',
+          target.body,
+        );
+      } else {
+        // Android fallback: not blocking — surfaced as an info alert.
+        Alert.alert(
+          'Edit not available',
+          'Inline edit is iOS-only for now.',
+          [{ text: 'OK', style: 'cancel' }],
+        );
+      }
+    };
+    const confirmDelete = () => {
+      Alert.alert(
+        'Delete message?',
+        'This cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => {
+              void deleteMessage(target.id);
+            },
+          },
+        ],
+      );
+    };
+
+    const buttons = [
+      ...(target.hasImage
+        ? []
+        : [{ text: 'Edit', onPress: promptForEdit } as const]),
+      { text: 'Delete', style: 'destructive' as const, onPress: confirmDelete },
+      { text: 'Cancel', style: 'cancel' as const, onPress: closeMenu },
+    ];
+    Alert.alert('Message', undefined, buttons);
+    // Clear the trigger so a subsequent long-press on the same row
+    // re-opens. Using a microtask so the menu actually shows first.
+    queueMicrotask(closeMenu);
+  }, [actionFor, deleteMessage, editMessage]);
   useEffect(() => {
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
@@ -298,6 +388,9 @@ const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ t
               senderId?: string;
               senderUid?: string;
               message: string;
+              mediaUrl?: string | null;
+              messageType?: string;
+              editedAt?: number | null;
               createdAt?: unknown;
             };
             const isSelf = (m.senderUid ?? m.senderId) === currentUserId;
@@ -305,7 +398,27 @@ const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ t
               typeof m.createdAt === 'number'
                 ? m.createdAt
                 : (m.createdAt as { toMillis?: () => number })?.toMillis?.() ?? undefined;
-            return <MessageBubble text={m.message} isSelf={isSelf} timestamp={ts} theme={theme} />;
+            const hasImage = m.messageType === 'image' && !!m.mediaUrl;
+            return (
+              <MessageBubble
+                text={m.message}
+                isSelf={isSelf}
+                timestamp={ts}
+                theme={theme}
+                mediaUrl={hasImage ? m.mediaUrl : null}
+                edited={!!m.editedAt}
+                onLongPress={
+                  isSelf
+                    ? () =>
+                        setActionFor({
+                          id: m.id,
+                          body: m.message ?? '',
+                          hasImage,
+                        })
+                    : undefined
+                }
+              />
+            );
           }}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -317,6 +430,9 @@ const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ t
         autoFocus
         onSend={async (text) => {
           await sendMessage(text);
+        }}
+        onSendImage={async (file) => {
+          await sendImage(file);
         }}
       />
     </View>

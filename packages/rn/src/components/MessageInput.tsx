@@ -1,11 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, TextInput, Pressable, Text, StyleSheet, ActivityIndicator, InteractionManager } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, TextInput, Pressable, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import type { WidgetTheme } from '../theme';
 import type { WidgetLabels } from '../i18n';
 
 export interface MessageInputProps {
   theme: WidgetTheme;
   onSend: (text: string) => void | Promise<void>;
+  /** Optional: when set, the input shows a paperclip button. Called
+   *  with the picked file in the React Native `{ uri, name, type }`
+   *  shape so callers can hand it straight to the upload helper. */
+  onSendImage?: (file: { uri: string; name: string; type: string }) => void | Promise<void>;
   placeholder?: string;
   disabled?: boolean;
   disabledReason?: string;
@@ -17,6 +21,7 @@ export interface MessageInputProps {
 export const MessageInput: React.FC<MessageInputProps> = ({
   theme,
   onSend,
+  onSendImage,
   placeholder,
   disabled = false,
   disabledReason,
@@ -41,6 +46,66 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const sendText = labels?.send ?? 'Send';
   const [value, setValue] = useState('');
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  /** Lazy-load expo-image-picker — most Expo apps have it, so we keep
+   *  the SDK free of a hard peer dep. If it isn't installed the
+   *  paperclip button surfaces an info alert instead. */
+  type ImagePickerModule = {
+    requestMediaLibraryPermissionsAsync: () => Promise<{ granted: boolean }>;
+    launchImageLibraryAsync: (opts: {
+      mediaTypes?: unknown;
+      quality?: number;
+      allowsEditing?: boolean;
+    }) => Promise<{
+      canceled: boolean;
+      assets?: Array<{
+        uri: string;
+        fileName?: string | null;
+        mimeType?: string | null;
+      }>;
+    }>;
+    MediaTypeOptions: { Images: unknown };
+  };
+
+  const pickAndSendImage = async () => {
+    if (!onSendImage || uploading || disabled) return;
+    let ImagePicker: ImagePickerModule | null = null;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      ImagePicker = require('expo-image-picker') as ImagePickerModule;
+    } catch {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { Alert } = require('react-native');
+      Alert.alert(
+        'Image picker not installed',
+        'Install expo-image-picker in your app to attach images.',
+      );
+      return;
+    }
+    if (!ImagePicker) return;
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.85,
+      allowsEditing: false,
+    });
+    if (res.canceled || !res.assets?.[0]) return;
+    const a = res.assets[0];
+    setUploading(true);
+    try {
+      await onSendImage({
+        uri: a.uri,
+        name: a.fileName ?? a.uri.split('/').pop() ?? 'image.jpg',
+        type: a.mimeType ?? 'image/jpeg',
+      });
+    } catch (err) {
+      console.warn('[chat-sdk-rn] image send failed:', err);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const submit = async () => {
     const trimmed = value.trim();
@@ -66,6 +131,24 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   return (
     <View style={[styles.row, { borderTopColor: theme.border, backgroundColor: theme.background }]}>
+      {onSendImage && (
+        <Pressable
+          onPress={pickAndSendImage}
+          disabled={uploading || disabled}
+          accessibilityLabel="Attach image"
+          style={({ pressed }) => [
+            styles.attachBtn,
+            { opacity: pressed && !uploading ? 0.6 : uploading ? 0.5 : 1 },
+          ]}
+        >
+          {uploading ? (
+            <ActivityIndicator size="small" color={theme.textSecondary} />
+          ) : (
+            // Plain-text paperclip glyph keeps the SDK icon-library-free.
+            <Text style={[styles.attachIcon, { color: theme.textSecondary }]}>📎</Text>
+          )}
+        </Pressable>
+      )}
       <TextInput
         ref={inputRef}
         value={value}
@@ -152,6 +235,16 @@ const styles = StyleSheet.create({
     // for visual balance against the input's vertical midline.
     lineHeight: 22,
     marginTop: -1,
+  },
+  attachBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachIcon: {
+    fontSize: 18,
   },
   disabled: {
     paddingVertical: 14,

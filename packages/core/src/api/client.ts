@@ -103,7 +103,7 @@ export interface ApiMessage {
 }
 
 export interface ApiConfig {
-  tenant: { id: string; name: string; integration_type: 'native' | 'hubspot' };
+  tenant: { id: string; name: string };
   realtime: { supabase_url: string; supabase_anon_key: string; channel_prefix: string };
 }
 
@@ -163,6 +163,64 @@ export const api = {
       path: `/api/v1/conversations/${conversationId}/messages`,
       body: args,
     }),
+
+  editMessage: (
+    conversationId: string,
+    msgId: string,
+    args: { sender_id: string; body: string },
+  ) =>
+    request<{ message: ApiMessage }>({
+      method: 'PATCH',
+      path: `/api/v1/conversations/${conversationId}/messages/${msgId}`,
+      body: args,
+    }),
+
+  deleteMessage: (
+    conversationId: string,
+    msgId: string,
+    args: { sender_id: string },
+  ) =>
+    request<{ ok: true }>({
+      method: 'DELETE',
+      path: `/api/v1/conversations/${conversationId}/messages/${msgId}`,
+      body: args,
+    }),
+
+  /** Upload an image attachment. Returns its public URL — caller then
+   *  calls sendMessage({ media_url, message_type: 'image' }). Uses
+   *  multipart/form-data so the regular JSON helper doesn't apply. */
+  uploadAttachment: async (
+    conversationId: string,
+    file: { uri: string; name: string; type: string },
+  ) => {
+    const base = getBaseUrl();
+    const cfg = getConfig();
+    const fd = new FormData();
+    // RN-friendly file blob shape: { uri, name, type }.
+    fd.append('file', file as unknown as Blob);
+    const res = await fetch(
+      `${base}/api/v1/conversations/${conversationId}/upload`,
+      {
+        method: 'POST',
+        headers: { 'x-tinychat-api-key': cfg.apiKey },
+        body: fd,
+      },
+    );
+    const parsed = (await res.json().catch(() => null)) as
+      | { url?: string; error?: string }
+      | null;
+    if (!res.ok) {
+      throw new ApiError(
+        res.status,
+        parsed?.error ?? `upload failed: ${res.status}`,
+        parsed,
+      );
+    }
+    if (!parsed?.url) {
+      throw new ApiError(500, 'upload returned no url', parsed);
+    }
+    return { url: parsed.url };
+  },
 };
 
 export { ApiError };

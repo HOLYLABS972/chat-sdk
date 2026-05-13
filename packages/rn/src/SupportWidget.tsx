@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FloatingButton } from './components/FloatingButton';
 import { Chatbox } from './components/Chatbox';
 import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, mergeTheme, type WidgetTheme } from './theme';
@@ -34,6 +34,11 @@ export interface SupportWidgetProps {
    *  callback instead of opening the built-in admin chat. Use this to
    *  hand off to a native chat SDK, an external deep link, etc. */
   onSendNewMessageOverride?: () => void;
+  /** Imperative "open now" trigger. Increment this number from outside
+   *  the widget (e.g. from a notification handler) to force the panel
+   *  open without the user tapping the FAB. Each unique increment opens
+   *  the widget once. */
+  openSignal?: number;
 }
 
 /**
@@ -60,8 +65,18 @@ export const SupportWidget: React.FC<SupportWidgetProps> = ({
   onOpen,
   onClose,
   onSendNewMessageOverride,
+  openSignal,
 }) => {
   const [open, setOpen] = useState(false);
+
+  // External "open now" trigger. Watch openSignal — any change opens
+  // the widget. We don't auto-close on change-back so the user can
+  // dismiss with the normal close affordance.
+  useEffect(() => {
+    if (openSignal === undefined) return;
+    setOpen(true);
+    onOpen?.();
+  }, [openSignal, onOpen]);
   const merged = mergeTheme(isDark ? DEFAULT_DARK_THEME : DEFAULT_LIGHT_THEME, theme);
 
   if (hidden) return null;
