@@ -28,6 +28,11 @@ export interface SupportWidgetProps {
   /** Distance from left edge. When set, overrides `right`. */
   left?: number;
   hidden?: boolean;
+  /** When true, the FloatingButton trigger is suppressed but the host
+   *  can still pop the modal open via openSignal. Useful for screens
+   *  where you don't want a FAB cluttering the UI but other affordances
+   *  (e.g. a chat icon on an order row) still drive into chat. */
+  fabHidden?: boolean;
   onOpen?: () => void;
   onClose?: () => void;
   /** When set, "Send new message" closes the widget and fires this
@@ -74,6 +79,7 @@ export const SupportWidget: React.FC<SupportWidgetProps> = ({
   right,
   left,
   hidden = false,
+  fabHidden = false,
   onOpen,
   onClose,
   onSendNewMessageOverride,
@@ -129,14 +135,16 @@ export const SupportWidget: React.FC<SupportWidgetProps> = ({
 
   return (
     <>
-      <FloatingButton
-        onPress={handleOpen}
-        theme={merged}
-        bottom={bottom}
-        top={top}
-        right={right}
-        left={left}
-      />
+      {!fabHidden && (
+        <FloatingButton
+          onPress={handleOpen}
+          theme={merged}
+          bottom={bottom}
+          top={top}
+          right={right}
+          left={left}
+        />
+      )}
       <Chatbox
         visible={open}
         onClose={handleClose}
