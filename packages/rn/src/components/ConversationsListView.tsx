@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { View, Text, FlatList, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { useOrderConversations, type OrderConversationRow } from '@holylabs/chat-sdk';
 import type { WidgetTheme } from '../theme';
@@ -36,6 +36,32 @@ export const ConversationsListView: React.FC<ConversationsListViewProps> = ({
   const { conversations, loading, error } = useOrderConversations();
   const L = labels;
 
+  // Conversation rows missing both a counterpart name and a last message
+  // are uninteresting placeholders (typically created when an order
+  // conversation was provisioned but no one's spoken). Filter them out
+  // so the user doesn't see "?" / "Tap to open chat" empty rows.
+  const visibleConversations = useMemo(
+    () =>
+      conversations.filter(
+        (c) =>
+          (c.counterpartName && c.counterpartName.trim().length > 0) ||
+          (c.lastMessage && c.lastMessage.trim().length > 0),
+      ),
+    [conversations],
+  );
+
+  // If exactly one real conversation remains after filtering, open it
+  // directly so the user lands on the actual chat instead of a list-of-one.
+  const autoOpenedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (loading || error) return;
+    if (visibleConversations.length !== 1) return;
+    const only = visibleConversations[0];
+    if (autoOpenedRef.current === only.orderId) return;
+    autoOpenedRef.current = only.orderId;
+    onOpenOrderChat(only.orderId);
+  }, [loading, error, visibleConversations, onOpenOrderChat]);
+
   if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: theme.surface }]}>
@@ -52,7 +78,7 @@ export const ConversationsListView: React.FC<ConversationsListViewProps> = ({
       </View>
     );
   }
-  if (conversations.length === 0) {
+  if (visibleConversations.length === 0) {
     return (
       <View style={[styles.center, { backgroundColor: theme.surface }]}>
         <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
@@ -80,7 +106,7 @@ export const ConversationsListView: React.FC<ConversationsListViewProps> = ({
 
   return (
     <FlatList
-      data={conversations}
+      data={visibleConversations}
       keyExtractor={(c) => c.orderId}
       style={{ flex: 1, backgroundColor: theme.surface }}
       contentContainerStyle={{ paddingVertical: 8 }}
