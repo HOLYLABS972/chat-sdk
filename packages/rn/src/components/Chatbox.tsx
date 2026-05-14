@@ -277,7 +277,12 @@ export const Chatbox: React.FC<ChatboxProps> = ({
 
         {view.kind === 'support' && (
           <ViewBoundary viewName="support">
-            <SupportChat theme={theme} labels={labels} />
+            <SupportChat
+              theme={theme}
+              labels={labels}
+              counterpartName={openCounterpart?.name}
+              counterpartPhone={openCounterpart?.phone}
+            />
           </ViewBoundary>
         )}
 
@@ -291,7 +296,12 @@ export const Chatbox: React.FC<ChatboxProps> = ({
   );
 };
 
-const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ theme, labels }) => {
+const SupportChat: React.FC<{
+  theme: WidgetTheme;
+  labels: WidgetLabels;
+  counterpartName?: string;
+  counterpartPhone?: string;
+}> = ({ theme, labels, counterpartName, counterpartPhone }) => {
   const {
     messages,
     sendMessage,
@@ -416,6 +426,31 @@ const SupportChat: React.FC<{ theme: WidgetTheme; labels: WidgetLabels }> = ({ t
     // The previous 320 fallback made the panel "fly up" by 320-kbH
     // every time the keyboard dismissed — visually jarring on iOS.
     <View style={{ flex: 1, paddingBottom: kbH }}>
+      {(counterpartName || counterpartPhone) && (
+        <View
+          style={[
+            supportHeaderStyles.bar,
+            { backgroundColor: theme.surface, borderBottomColor: theme.border },
+          ]}
+        >
+          {counterpartName ? (
+            <Text
+              style={[supportHeaderStyles.name, { color: theme.textPrimary }]}
+              numberOfLines={1}
+            >
+              {counterpartName}
+            </Text>
+          ) : null}
+          {counterpartPhone ? (
+            <Text
+              style={[supportHeaderStyles.phone, { color: theme.textSecondary }]}
+              numberOfLines={1}
+            >
+              {counterpartPhone}
+            </Text>
+          ) : null}
+        </View>
+      )}
       {loading && messages.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator color={theme.primary} />
@@ -523,6 +558,16 @@ const typingIndicatorStyles = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
   },
+});
+
+const supportHeaderStyles = StyleSheet.create({
+  bar: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  name: { fontSize: 16, fontWeight: '700' },
+  phone: { fontSize: 13, marginTop: 2 },
 });
 
 // FAQ defaults moved to ../i18n.ts (role + language aware).
