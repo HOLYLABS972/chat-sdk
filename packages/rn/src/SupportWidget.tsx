@@ -56,6 +56,11 @@ export interface SupportWidgetProps {
   /** When `openTarget === 'order-chat'`, the order id to deep-link to.
    *  Ignored for other targets. */
   openOrderId?: string;
+  /** Optional counterpart name + phone to surface in the chat header
+   *  when the modal opens to an order chat. Useful when the host
+   *  already knows who the user is messaging (driver name + phone on
+   *  an order-detail screen) so the SDK doesn't have to round-trip. */
+  openCounterpart?: { name?: string; phone?: string };
 }
 
 /**
@@ -86,6 +91,7 @@ export const SupportWidget: React.FC<SupportWidgetProps> = ({
   openSignal,
   openTarget,
   openOrderId,
+  openCounterpart,
 }) => {
   const [open, setOpen] = useState(false);
   // Capture which view the host asked us to open on. Increments alongside
@@ -97,6 +103,9 @@ export const SupportWidget: React.FC<SupportWidgetProps> = ({
   const [externalOpenOrderId, setExternalOpenOrderId] = useState<string | undefined>(
     undefined,
   );
+  const [externalCounterpart, setExternalCounterpart] = useState<
+    { name?: string; phone?: string } | undefined
+  >(undefined);
   // Remember the openSignal value we saw on mount so the first render
   // doesn't auto-open the widget. Hosts that initialise the signal as
   // 0 (e.g. a useSyncExternalStore-backed counter) shouldn't have the
@@ -111,6 +120,7 @@ export const SupportWidget: React.FC<SupportWidgetProps> = ({
     if (openSignal === initialSignalRef.current) return;
     setExternalOpenTarget(openTarget);
     setExternalOpenOrderId(openOrderId);
+    setExternalCounterpart(openCounterpart);
     setOpen(true);
     onOpen?.();
     // openTarget/openOrderId intentionally not in deps — we read their
@@ -125,6 +135,7 @@ export const SupportWidget: React.FC<SupportWidgetProps> = ({
     // Manual FAB tap — always reset to the default landing.
     setExternalOpenTarget(undefined);
     setExternalOpenOrderId(undefined);
+    setExternalCounterpart(undefined);
     setOpen(true);
     onOpen?.();
   };
@@ -158,6 +169,7 @@ export const SupportWidget: React.FC<SupportWidgetProps> = ({
         onSendNewMessageOverride={onSendNewMessageOverride}
         openTarget={externalOpenTarget}
         openOrderId={externalOpenOrderId}
+        openCounterpart={externalCounterpart}
       />
     </>
   );

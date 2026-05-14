@@ -19,9 +19,21 @@ export interface OrderChatViewProps {
   orderId: string;
   receiverId?: string;
   labels?: WidgetLabels;
+  /** Display name of the person on the other side of the chat. When
+   *  provided, surfaces as a header strip so the user knows who they're
+   *  talking to. Optional — empty header bar when omitted. */
+  counterpartName?: string;
+  counterpartPhone?: string;
 }
 
-export const OrderChatView: React.FC<OrderChatViewProps> = ({ theme, orderId, receiverId, labels }) => {
+export const OrderChatView: React.FC<OrderChatViewProps> = ({
+  theme,
+  orderId,
+  receiverId,
+  labels,
+  counterpartName,
+  counterpartPhone,
+}) => {
   const L = labels;
   const { messages, sendMessage, loading, error } = useOrderChat(orderId);
   const listRef = useRef<FlatList<unknown> | null>(null);
@@ -52,6 +64,25 @@ export const OrderChatView: React.FC<OrderChatViewProps> = ({ theme, orderId, re
 
   return (
     <View style={{ flex: 1, paddingBottom: kbH > 0 ? kbH : 320 }}>
+      {(counterpartName || counterpartPhone) && (
+        <View
+          style={[
+            styles.counterpartBar,
+            { backgroundColor: theme.surface, borderBottomColor: theme.border },
+          ]}
+        >
+          {counterpartName ? (
+            <Text style={[styles.counterpartName, { color: theme.textPrimary }]} numberOfLines={1}>
+              {counterpartName}
+            </Text>
+          ) : null}
+          {counterpartPhone ? (
+            <Text style={[styles.counterpartPhone, { color: theme.textSecondary }]} numberOfLines={1}>
+              {counterpartPhone}
+            </Text>
+          ) : null}
+        </View>
+      )}
       {loading && messages.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator color={theme.primary} />
@@ -121,4 +152,17 @@ const styles = StyleSheet.create({
   emptySubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
   errorText: { fontSize: 14, textAlign: 'center' },
   listContent: { paddingVertical: 12 },
+  counterpartBar: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  counterpartName: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  counterpartPhone: {
+    fontSize: 13,
+    marginTop: 2,
+  },
 });

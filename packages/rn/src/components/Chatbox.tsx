@@ -81,6 +81,8 @@ export interface ChatboxProps {
   openTarget?: 'landing' | 'conversations' | 'support' | 'order-chat';
   /** When openTarget === 'order-chat', the order id to deep-link to. */
   openOrderId?: string;
+  /** Optional counterpart info surfaced in the chat header. */
+  openCounterpart?: { name?: string; phone?: string };
 }
 
 type ViewState =
@@ -112,6 +114,7 @@ export const Chatbox: React.FC<ChatboxProps> = ({
   onSendNewMessageOverride,
   openTarget,
   openOrderId,
+  openCounterpart,
 }) => {
   const handleSendNewMessage = () => {
     if (onSendNewMessageOverride) {
@@ -262,7 +265,13 @@ export const Chatbox: React.FC<ChatboxProps> = ({
 
         {view.kind === 'order-chat' && (
           <ViewBoundary viewName="order-chat">
-            <OrderChatView theme={theme} orderId={view.orderId} labels={labels} />
+            <OrderChatView
+              theme={theme}
+              orderId={view.orderId}
+              labels={labels}
+              counterpartName={openCounterpart?.name}
+              counterpartPhone={openCounterpart?.phone}
+            />
           </ViewBoundary>
         )}
 
