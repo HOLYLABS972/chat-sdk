@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FloatingButton } from './components/FloatingButton';
 import { Chatbox } from './components/Chatbox';
 import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, mergeTheme, type WidgetTheme } from './theme';
@@ -91,12 +91,18 @@ export const SupportWidget: React.FC<SupportWidgetProps> = ({
   const [externalOpenOrderId, setExternalOpenOrderId] = useState<string | undefined>(
     undefined,
   );
+  // Remember the openSignal value we saw on mount so the first render
+  // doesn't auto-open the widget. Hosts that initialise the signal as
+  // 0 (e.g. a useSyncExternalStore-backed counter) shouldn't have the
+  // chatbox flash open on app start.
+  const initialSignalRef = useRef<number | undefined>(openSignal);
 
   // External "open now" trigger. Watch openSignal — any change opens
   // the widget. We don't auto-close on change-back so the user can
   // dismiss with the normal close affordance.
   useEffect(() => {
     if (openSignal === undefined) return;
+    if (openSignal === initialSignalRef.current) return;
     setExternalOpenTarget(openTarget);
     setExternalOpenOrderId(openOrderId);
     setOpen(true);
