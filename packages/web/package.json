@@ -1,6 +1,6 @@
 {
   "name": "@holylabs/chat-sdk-web",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Web (React DOM) floating support widget for @holylabs/chat-sdk. Drop-in <HolyChat /> for Next.js, marketing sites, and admin dashboards.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

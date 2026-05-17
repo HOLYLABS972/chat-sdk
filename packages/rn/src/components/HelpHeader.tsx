@@ -145,8 +145,17 @@ const HeroHeader: React.FC<{
           >
             <Text style={[styles.heroIconGlyph, { color: fg }]}>‹</Text>
           </Pressable>
-        ) : brand.logo ? (
-          <Image source={brand.logo} style={styles.heroLogo} resizeMode="contain" />
+        ) : brand.logo || brand.name ? (
+          <View style={styles.heroBrandRow}>
+            {brand.logo ? (
+              <Image source={brand.logo} style={styles.heroLogo} resizeMode="contain" />
+            ) : null}
+            {brand.name ? (
+              <Text style={[styles.heroBrandName, { color: fg }]} numberOfLines={1}>
+                {brand.name}
+              </Text>
+            ) : null}
+          </View>
         ) : (
           <View style={{ width: 36 }} />
         )}
@@ -285,6 +294,17 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
+  },
+  heroBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexShrink: 1,
+  },
+  heroBrandName: {
+    fontSize: 17,
+    fontWeight: '700',
+    flexShrink: 1,
   },
   heroIconBtn: {
     width: 32,

@@ -5,7 +5,12 @@ import type { FaqItem, QuickLink } from './types';
 import { defaultFaq, getLabels, type Lang, type WidgetLabels } from './i18n';
 
 export interface HolyChatProps {
-  brand: { name: string; greeting?: string };
+  brand: {
+    name: string;
+    greeting?: string;
+    /** Optional brand logo shown next to the name in the header. URL string. */
+    logo?: string;
+  };
   faq?: FaqItem[];
   quickLinks?: QuickLink[];
   language?: Lang;
@@ -191,7 +196,7 @@ export const HolyChat: React.FC<HolyChatProps> = ({
 
 const Header: React.FC<{
   theme: WebWidgetTheme;
-  brand: { name: string };
+  brand: { name: string; logo?: string };
   onClose: () => void;
   onBack?: () => void;
   labels: WidgetLabels;
@@ -210,7 +215,26 @@ const Header: React.FC<{
         ‹
       </IconButton>
     ) : (
-      <span style={{ fontSize: 17, fontWeight: 700, flex: 1 }}>{brand.name}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+        {brand.logo && (
+          <img
+            src={brand.logo}
+            alt=""
+            style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'contain' }}
+          />
+        )}
+        <span
+          style={{
+            fontSize: 17,
+            fontWeight: 700,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {brand.name}
+        </span>
+      </div>
     )}
     {onBack && <span style={{ flex: 1 }} />}
     <IconButton theme={theme} ariaLabel={labels.close} onClick={onClose}>
